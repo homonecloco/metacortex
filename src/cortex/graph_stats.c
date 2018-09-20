@@ -424,6 +424,9 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
         log_and_screen_printf("ERROR: Can't open contig (fastg) file.\n%s\n", fastg_filename);
         exit(-1);
     }
+    // write the header
+    fprintf(fp_contigs_fastg, "#FASTG:begin;");
+    fprintf(fp_contigs_fastg, "\n#FASTG:version=1.0:assembly_name=\"%s\";", consensus_contigs_filename);
 
     /* Open gfa contigs file */
     sprintf(gfa_filename, "%s.gfa", consensus_contigs_filename);
@@ -685,10 +688,11 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         // NOTE: decision - minimum cov or average cov dictates confidence threshold met?
                         // Output for alternative formats
                         if(fp_contigs_gfa!=NULL){
-                            fprintf(fp_contigs_gfa, "H %qd", simple_path->id);
+                            fprintf(fp_contigs_gfa, "H\tp%qd\n", simple_path->id);
                         }
                         path_to_fasta(simple_path, fp_contigs_fasta);
-                        path_to_fastg_gfa(simple_path, fp_contigs_fastg, fp_contigs_gfa, graph);
+                        //path_to_fastg_gfa(simple_path, fp_contigs_fastg, fp_contigs_gfa, graph);
+                        path_to_gfa_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
                         counter++;
                     } else {
                         log_printf("Didn't write path of size %d\n", simple_path->length);
@@ -768,6 +772,10 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
     log_and_screen_printf("Full traversal started...");
     hash_table_traverse(&traversal_for_contigs, graph);
     log_and_screen_printf("DONE\n");
+    
+    // write the fastg footer
+    fprintf(fp_contigs_fastg, "\n#FASTG:end;");
+    
     fclose(fp_analysis);
     fclose(fp_degrees);
 

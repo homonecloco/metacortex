@@ -2757,3 +2757,466 @@ void path_counts_add(Path * p, PathCounts * pc)
         pc->is_double_y++;
     }
 }
+
+void write_gfa_segment(Path* path, const gfa_segment* const segment, gfa_file_wrapper* gfa_file)
+{
+    fprintf(gfa_file->m_file, "S\tp%qds%i\t%lu\t%s\n", 
+                        path->id,
+                        segment->m_segment_id, 
+                        strlen(segment->m_nucleotide_sequence), 
+                        segment->m_nucleotide_sequence);  
+}
+
+void write_gfa_edge(Path* path, const gfa_segment* const first_segment, const gfa_segment* const second_segment, gfa_file_wrapper* gfa_file)
+{
+    assert(first_segment != NULL);
+    assert(second_segment != NULL);
+    char first_orientation = first_segment->m_orientation == forward ? '+' : '-';
+    char second_orientation = second_segment->m_orientation == forward ? '+' : '-';
+    fprintf(gfa_file->m_file, "E\tp%qds%i_p%qds%i\tp%qds%i%c\tp%qds%i%c\t$\t$\t0\t0\n",
+                        path->id, first_segment->m_segment_id, path->id, second_segment->m_segment_id,
+                        path->id, first_segment->m_segment_id, first_orientation,
+                        path->id, second_segment->m_segment_id, second_orientation);                       
+}
+
+void path_to_gfa_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* file_fastg)
+{
+    // Sanity checking
+    if (path == NULL) {
+        fprintf(stderr,	"[path_to_gfa_and_fastg] trying to print a null Path\n");
+        exit(-1);
+    }
+    assert(file_gfa != NULL);
+    assert(file_fastg != NULL);
+    
+    // write fastg header
+    fprintf(file_fastg, "\n>contig_%qd\n", path->id);
+    
+    
+    gfa_file_wrapper gfa_file_wrapper;
+    gfa_file_wrapper.m_file = file_gfa;
+    gfa_file_wrapper.m_segment_count = 0;
+    
+    //start the recursion!
+    int start_pos = 0;
+    if (flags_check_for_flag(PRINT_FIRST, &(path->flags))) 
+    {
+        if (path->length == 0) 
+        {
+            fprintf(stderr, "[path_to_gfa_and_fastg] Trying to print an empty path[1]!\n");
+            return;
+        }
+    } 
+    else 
+    {
+        if (path->length < 2) 
+        {
+            fprintf(stderr, "[path_to_gfa_and_fastg] Trying to print an empty path[2]!\n");
+            return;
+        }
+        start_pos = 1;
+    }
+    int end_pos = path->length;
+    fastg_recursion_level = 0;
+    write_paths_between_nodes(path, start_pos, end_pos, graph, NULL, false, true, &gfa_file_wrapper, file_fastg);
+}
+
+gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dBGraph* graph, gfa_segment** previous_segments, boolean include_last_step, boolean first_path, gfa_file_wrapper* file_gfa, FILE* file_fastg)
+{
+    log_printf("\n--Write paths between nodes for sequence %s, between %i and %i--\n", path->seq, start_pos, end_pos);
+    fastg_recursion_level++;
+    // Should not be the first path and also from a polymorphism.
+    // This is actually pretty ugly, maybe this can be made neater by using more functions.
+    assert(!(include_last_step && first_path));
+    int current_pos = start_pos;
+    Path* paths[4];
+    path_overlap_pair* overlaps[4];
+    for(int i = 0; i < 4; i++)
+    {
+        paths[i] = NULL;
+        overlaps[i] = NULL;
+    }
+    boolean polymorphism = false;
+    int polymorphism_end_pos = -1;
+    // TODO: Come up with a sensible value for this. What if there is a mega-insertion?
+    // Is it okay to just have the largest possible path size?
+    int max_path_length = 10 * path->length; 
+    int main_path = -1;
+            
+    while(current_pos < end_pos)
+    {
+        if(path->nodes[current_pos]->flags & POLYMORPHISM)
+        {
+            log_printf("Potential polymorphism at position %i\n", current_pos);
+            // this node is a candidate for a bubble
+            // check every edge leaving this node
+            dBNode* current_node = path->nodes[current_pos];
+            Orientation orientation = path->orientations[current_pos];
+            int min_overlap = path->length + 1;
+            for(int i = 0; i < 4; i++)
+            {
+                overlaps[i] = NULL;
+                paths[i] = NULL;
+                if(db_node_edge_exist_any_colour(current_node, i, orientation))
+                {
+                    log_printf("Potential polymorphism at edge %i\n", i);
+                    // get the perfect path leaving this node along this edge.
+                    // check to see if it overlaps with the main path 
+                    // (note: one of these paths should be a subpath of the main path)
+                    pathStep current_step;
+                    current_step.node = current_node;
+                    current_step.label = i;
+                    current_step.orientation = orientation;
+                    current_step.flags = 0;
+                    
+                    //TODO: do we want to use the perfect path here? This will only find individual SNPs?
+                    paths[i] = path_new(max_path_length, graph->kmer_size);
+                    log_printf("Creating path %i\n", i);
+                    db_graph_get_perfect_path_with_first_edge_all_colours(&current_step, &db_node_action_do_nothing, paths[i], graph);
+
+                    // TODO: check path coverage is "big enough" - what does this even mean?
+                    double avg_coverage = 0;
+                    int min_coverage = 0;
+                    int max_coverage = 0;
+                    path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, paths[i]);
+                    
+                    assert(paths[i]->length > 0);
+                    
+                    if(paths[i]->nodes[1] == path->nodes[current_pos + 1])
+                    {
+                        // paths[i] is the original path
+                        log_printf("Main path is %i\n", i);
+                        main_path = i;
+                        overlaps[i] = calloc(1,sizeof(path_overlap_pair));
+                    }
+                    else
+                    {
+                        // find the path(s) which overlaps with main path first.
+                        // TODO: Can we deal with the case where there are several different paths
+                        // of different lengths? Need to think of a good way to deal with the segments between ends.
+                        log_printf("Recursion level: %i\n", fastg_recursion_level);
+                        overlaps[i] = malloc(sizeof(path_overlap_pair));
+                        *overlaps[i] = find_first_overlap_from_pos(path, current_pos + 1, paths[i]);
+                        log_printf("Checking for overlap between sequences %s and %s from pos %i/%i\n", path->seq, paths[i]->seq, current_pos + 1, path->length - 1);
+                        log_printf("ref overlap: %i/%i,  query overlap: %i/%i\n", overlaps[i]->ref_overlap, path->length-1, overlaps[i]->query_overlap, paths[i]->length - 1);
+                        if(overlaps[i]->ref_overlap >= 0 && overlaps[i]->ref_overlap < min_overlap)
+                        {
+                            log_printf("Found polymorphism!\n");
+                            min_overlap = overlaps[i]->ref_overlap;
+                            polymorphism = true;
+                        }
+                    }
+                }
+            }
+            
+            // get rid of paths that didn't make it, if any.
+            for(int i = 0; i < 4; i++)
+            {
+                if(i != main_path && paths[i])
+                {
+                    boolean keep_path = (overlaps[i]->ref_overlap == min_overlap);
+                    if(!keep_path)
+                    {
+                        log_printf("Destroying path and overlap %i\n", i);
+                        path_destroy(paths[i]);
+                        paths[i] = NULL;
+                        
+                        free(overlaps[i]);
+                        overlaps[i] = NULL;
+                    }
+                }
+            }
+                        
+            assert(main_path != -1);
+            assert(paths[main_path] != NULL);
+                                 
+            if(polymorphism)
+            {
+                polymorphism_end_pos = min_overlap; 
+                // this is where the two paths join back together
+                // don't forget that paths[main_path] starts at current_pos
+                log_printf("Found joining position %i, main path %i, current pos %i\n", polymorphism_end_pos, main_path, current_pos);
+                overlaps[main_path]->query_overlap = polymorphism_end_pos - current_pos;
+                break;
+            }
+            else
+            {
+                // only found one path. move on to next node.
+                path_destroy(paths[main_path]);
+                paths[main_path] = NULL;
+            }
+        }
+        current_pos++;      
+    }
+    
+    log_printf("Writing first segment\n");
+    // construct the segment from start_pos up to polymorphism
+    gfa_segment current_segment;
+    int sequence_length = current_pos - start_pos;
+    assert(sequence_length >= 0);
+    if(include_last_step)
+    {
+        // add the polymorphism edge to the start of the sequence
+        sequence_length += 1;
+    }
+    if(first_path)
+    {
+        // add the initial k-mer to the first sequence in the path
+        sequence_length += path->kmer_size;
+    }
+    char sequence[sequence_length + 1];
+    if(first_path)
+    {
+        char kmer_string[path->kmer_size + 1];
+        kmer_string[path->kmer_size] = '\0';
+        BinaryKmer kmer; 
+        binary_kmer_assignment_operator(kmer, *element_get_kmer(path->nodes[0]));
+        if(path->orientations[0] == reverse)
+        {
+            // what even is this
+            BinaryKmer reverse_kmer;
+            binary_kmer_reverse_complement(&kmer, path->kmer_size, &reverse_kmer);
+            binary_kmer_to_seq(&reverse_kmer, path->kmer_size, kmer_string);
+        }
+        else
+        {
+            binary_kmer_to_seq(&kmer, path->kmer_size, kmer_string);
+        }
+        strncpy(sequence, kmer_string, path->kmer_size + 1);
+        strncat(sequence, path->seq + start_pos, current_pos - start_pos);
+    }
+    else
+    {
+        if(include_last_step)
+        {
+            assert(start_pos != 0);
+            strncpy(sequence, path->seq + start_pos - 1, sequence_length);
+        }
+        else
+        {
+            strncpy(sequence, path->seq + start_pos, sequence_length);
+        }
+    }
+    sequence[sequence_length] = '\0';
+    current_segment.m_nucleotide_sequence = sequence;
+    //TODO: should this be the orientation from the DB graph, or is it just for GFA purposes?
+    current_segment.m_orientation = forward; //path->orientations[current_pos];
+    current_segment.m_segment_id = (file_gfa->m_segment_count)++;
+    
+    write_gfa_segment(path, &current_segment, file_gfa);
+    
+    if(previous_segments)
+    {
+        for(int i = 0; i < 4; i++)
+        {
+            if(previous_segments[i])
+            {
+                write_gfa_edge(path, previous_segments[i], &current_segment, file_gfa);
+            }
+        }
+    }
+    
+    // write to fastg
+    if(fastg_recursion_level == 1)
+    {
+        fprintf(file_fastg, "%s", sequence);
+    }
+    
+    if(!polymorphism)
+    {
+        log_printf("No polymorphism\n");
+        fastg_recursion_level--;
+        for(int i = 0; i < 4; i++)
+        {
+            assert(paths[i] == NULL);
+        }
+        return current_segment;
+    }
+    else
+    {
+        // write polymorphisms to fastg
+        // get sequence from main path (except for the last k)
+        if(fastg_recursion_level == 1)
+        {
+            log_printf("Writing sequence to fastg");
+            int main_seq_length = overlaps[main_path]->query_overlap;//strlen(paths[main_path]->seq);// - path->kmer_size;
+            assert(main_seq_length >= 0);
+            char main_seq[main_seq_length + 1];
+            strncpy(main_seq, paths[main_path]->seq, main_seq_length);
+            main_seq[main_seq_length] = '\0';
+
+            fprintf(file_fastg, "%s", main_seq);
+            fprintf(file_fastg, "[%i:alt|", main_seq_length);
+            fprintf(file_fastg, "%s", main_seq);
+            
+            for(int i = 0; i < 4; i++)
+            {
+                if(i != main_path && paths[i])
+                {
+                    int alt_seq_length = overlaps[i]->query_overlap;
+                    assert(alt_seq_length >= 0);
+                    char alt_seq[alt_seq_length + 1];
+                    strncpy(alt_seq, paths[i]->seq, alt_seq_length);
+                    alt_seq[alt_seq_length] = '\0';       
+                    fprintf(file_fastg, ",%s", alt_seq);
+                }
+            }
+            fprintf(file_fastg, "]");
+        }
+             
+        gfa_segment* return_segments[4];
+        gfa_segment* current_segment_array[4];
+        current_segment_array[0] = &current_segment;
+        current_segment_array[1] = NULL;
+        current_segment_array[2] = NULL; 
+        current_segment_array[3] = NULL; 
+        // deal with the polymorphisms
+        for(int i = 0; i < 4; i++)
+        {
+            if(paths[i])
+            {
+                 log_printf("Starting recursion for path %i\n", i);
+                // TODO: path[i] is a perfect path, so shouldn't have any polymorphisms?
+                // maybe we can use a different path instead so that we can look for polymorphism along this path.
+                
+                int end_pos = overlaps[i]->query_overlap;
+                log_printf("End pos: %i\n", end_pos);
+                
+                //allocate some memory for the next segment
+                return_segments[i] = malloc(sizeof(gfa_segment));
+                if(end_pos > 0)
+                {                 
+                    *return_segments[i] = write_paths_between_nodes(paths[i], 1, end_pos, graph, current_segment_array, true, false, file_gfa, file_fastg);
+                }
+                else
+                {
+                    // In this case we have an indel, so we need to join the current segment to the next one.
+                    // Just make a copy so that we can free this pointer later.
+                    *return_segments[i] = current_segment;
+                }
+            }
+            else
+            {
+                return_segments[i] = NULL;
+            }
+        }
+
+        //destroy the paths and overlaps
+        for(int i = 0; i < 4; i++)
+        {
+            if(paths[i])
+            {
+                // we are done with this path now
+                path_destroy(paths[i]);
+                paths[i] = NULL;
+            }
+            if(overlaps[i])
+            {
+                free(overlaps[i]);
+                overlaps[i] = NULL;
+            }
+        }
+    
+        // All return segments finish at the same place, end_node, so we continue from there.      
+        int new_start_pos = polymorphism_end_pos;
+        boolean include_last_step = false;
+        if(new_start_pos ==  current_pos)
+        {
+            // Backtraced to current pos, so this polymorphism was an indel.
+            // Start from the next node and add the previous step to the first sequence.
+            // ugh, this is getting messy
+            new_start_pos += 1;
+            include_last_step = true;
+        }
+        
+        // TODO ...there must be a better way of doing this
+        fastg_recursion_level--;
+        // If new_start_pos is the last node in the path, then there are no more sequences!
+        gfa_segment end;
+        if(new_start_pos < end_pos - 1)
+        {
+            end = write_paths_between_nodes(path, new_start_pos, end_pos, graph, return_segments, include_last_step, false, file_gfa, file_fastg);
+        }
+        // destroy the return segments
+        for(int i = 0; i < 4; i++)
+        {
+            if(return_segments[i])
+            {
+                free(return_segments[i]);
+                return_segments[i] = NULL;
+            }
+        }
+        
+        return end;
+    }
+}
+
+// finds the first node on ref_path that is also on query_path.
+path_overlap_pair find_first_overlap_from_pos(const Path* const ref_path, int ref_path_start_pos, const Path* const query_path)
+{
+    path_overlap_pair ret;
+    ret.ref_overlap = -1;
+    ret.query_overlap = -1;
+    for(int i = ref_path_start_pos; i < ref_path->length; i++)
+    {
+        if(ref_path->nodes[i] == NULL)
+        {
+            return ret;
+        }
+        for(int j = 0; j < query_path->length; j++)
+        {
+            if(ref_path->nodes[i] == query_path->nodes[j])
+            {
+                Orientation ref_orientation = ref_path->orientations[i];
+                Orientation query_orientation = query_path->orientations[j];
+                // is this really the same node though?
+                if(ref_orientation == query_orientation)
+                {
+                    if(DEBUG)
+                    {
+                        int k = ref_path->kmer_size;
+                        char kmer_string_ref[k + 1];
+                        kmer_string_ref[k] = '\0';
+                        BinaryKmer ref_kmer; 
+                        binary_kmer_assignment_operator(ref_kmer, *element_get_kmer(ref_path->nodes[i]));
+                        binary_kmer_to_seq(&ref_kmer, k, kmer_string_ref);
+
+                        char kmer_string_query[k + 1];
+                        kmer_string_query[k] = '\0';
+                        BinaryKmer query_kmer; 
+                        binary_kmer_assignment_operator(query_kmer, *element_get_kmer(query_path->nodes[j]));
+                        binary_kmer_to_seq(&query_kmer, k, kmer_string_query);
+
+                        log_printf("Ref kmer:\t\t%s\n", kmer_string_ref);
+                        log_printf("Query kmer:\t\t%s\n", kmer_string_query);
+
+                        log_printf("Ref Sequence: %s \t Query Sequence: %s\n", ref_path->seq, query_path->seq);
+                        log_printf("Overlap at %i,%i\n", i, j);
+                        log_printf("Ref[%i] = %c, Query[%i] = %c\n", i-3, ref_path->seq[i-3], j-3, query_path->seq[j-3] );
+                        log_printf("Ref[%i] = %c, Query[%i] = %c\n", i-2, ref_path->seq[i-2], j-2, query_path->seq[j-2] );
+                        log_printf("Ref[%i] = %c, Query[%i] = %c\n", i-1, ref_path->seq[i-1], j-1, query_path->seq[j-1] );
+                        log_printf("Ref[%i] = %c, Query[%i] = %c\n", i, ref_path->seq[i], j, query_path->seq[j] );
+                        log_printf("Ref[%i] = %c, Query[%i] = %c\n", i+1, ref_path->seq[i+1], j+1, query_path->seq[j+1] );
+                        log_printf("Ref[%i] = %c, Query[%i] = %c\n", i+2, ref_path->seq[i+2], j+2, query_path->seq[j+2] );
+                    }
+                    assert(ref_path->seq[i-1] == query_path->seq[j-1]);
+
+                    // work backwards until we get to the first base that that differs.
+                    int m = 0;
+                    while(ref_path->seq[i-1-m] == query_path->seq[j-1-m])
+                    {
+                        m++;
+                    }
+                    assert(m <= i);
+                    assert(m <= j);
+                    ret.ref_overlap = i - m;
+                    ret.query_overlap = j - m;
+                    return ret;
+
+                }
+            }
+        }
+    }
+    log_printf("Did not find overlap\n");
+    return ret;
+}

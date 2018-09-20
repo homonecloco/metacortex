@@ -435,4 +435,26 @@ void post_polymorph_L_lines(FILE * f, gfa_stats * gfa);
 
 void add_to_P_line(gfa_stats * gfa);
 
+typedef struct {
+    int m_segment_id;
+    char* m_nucleotide_sequence;
+    Orientation m_orientation;
+} gfa_segment;
+
+typedef struct {
+    FILE* m_file;
+    int m_segment_count;
+} gfa_file_wrapper;
+
+typedef struct {
+    int query_overlap;
+    int ref_overlap;
+} path_overlap_pair;
+
+void write_gfa_segment(Path* path, const gfa_segment* const segment, gfa_file_wrapper* gfa_file);
+void write_gfa_edge(Path* path, const gfa_segment* const first_segment, const gfa_segment* const second_segment, gfa_file_wrapper* gfa_file);
+gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, HashTable* graph, gfa_segment** previous_segments, boolean include_last_step, boolean first_path, gfa_file_wrapper* file_gfa, FILE* file_fastg);
+void path_to_gfa_and_fastg(Path* path, HashTable* graph, FILE* file_gfa, FILE* file_fastg);
+path_overlap_pair find_first_overlap_from_pos(const Path* const ref_path, int ref_path_start_pos, const Path* const query_path);
+int fastg_recursion_level;
 #endif /* PATH_H_ */
