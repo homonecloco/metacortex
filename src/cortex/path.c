@@ -2758,29 +2758,35 @@ void path_counts_add(Path * p, PathCounts * pc)
     }
 }
 
-void write_gfa_segment(Path* path, const gfa_segment* const segment, gfa_file_wrapper* gfa_file)
+void write_gfa_segment(const gfa_segment* const segment, gfa_file_wrapper* gfa_file)
 {
     fprintf(gfa_file->m_file, "S\tp%qds%i\t%lu\t%s\n", 
-                        path->id,
+                        gfa_file->m_path_id,
                         segment->m_segment_id, 
                         strlen(segment->m_nucleotide_sequence), 
                         segment->m_nucleotide_sequence);  
 }
 
-void write_gfa_edge(Path* path, const gfa_segment* const first_segment, const gfa_segment* const second_segment, gfa_file_wrapper* gfa_file)
+void write_gfa_edge(const gfa_segment* const first_segment, const gfa_segment* const second_segment, gfa_file_wrapper* gfa_file)
 {
     assert(first_segment != NULL);
     assert(second_segment != NULL);
+    int first_length = strlen(first_segment->m_nucleotide_sequence);
     char first_orientation = first_segment->m_orientation == forward ? '+' : '-';
     char second_orientation = second_segment->m_orientation == forward ? '+' : '-';
-    fprintf(gfa_file->m_file, "E\tp%qds%i_p%qds%i\tp%qds%i%c\tp%qds%i%c\t$\t$\t0\t0\n",
-                        path->id, first_segment->m_segment_id, path->id, second_segment->m_segment_id,
-                        path->id, first_segment->m_segment_id, first_orientation,
-                        path->id, second_segment->m_segment_id, second_orientation);                       
+    fprintf(gfa_file->m_file, "E\tp%qds%i_p%qds%i\tp%qds%i%c\tp%qds%i%c\t%lu$\t%lu$\t0\t0\t*\n",
+                        gfa_file->m_path_id, first_segment->m_segment_id, gfa_file->m_path_id, second_segment->m_segment_id,
+                        gfa_file->m_path_id, first_segment->m_segment_id, first_orientation,
+                        gfa_file->m_path_id, second_segment->m_segment_id, second_orientation,
+                        first_length, first_length);                       
 }
 
-void path_to_gfa_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* file_fastg)
+void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* file_fastg)
 {
+    char sequence[graph->kmer_size + 1];
+    binary_kmer_to_seq(element_get_kmer(path->nodes[0]), graph->kmer_size, sequence);
+    log_printf("---------------------------\n");
+    log_printf("[path_to_gfa_and_fastg] Writing gfa and fastg for path %s%s", sequence, path->seq);
     // Sanity checking
     if (path == NULL) {
         fprintf(stderr,	"[path_to_gfa_and_fastg] trying to print a null Path\n");
@@ -2789,15 +2795,74 @@ void path_to_gfa_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fil
     assert(file_gfa != NULL);
     assert(file_fastg != NULL);
     
-    // write fastg header
-    fprintf(file_fastg, "\n>contig_%qd\n", path->id);
     
     
-    gfa_file_wrapper gfa_file_wrapper;
-    gfa_file_wrapper.m_file = file_gfa;
-    gfa_file_wrapper.m_segment_count = 0;
+    // write fastg header  
+    short kmer_size = path->kmer_size;
+    int length = path->length;
+    double avg_coverage;
+    int min_coverage;
+    int max_coverage;
+    path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, path);
+
+    // Get orientation of first and last node
+    Orientation fst_orientation;
+    fst_orientation = path->orientations[0];
+    Orientation lst_orientation = path->orientations[path->length];
+
+    // Get the first node - this will be nodes[0] if PRINT_FIRST is
+    // specified, or nodes[1] otherwise.
+    dBNode *fst_node;
+    if (flags_check_for_flag(PRINT_FIRST, &(path->flags))) 
+    {
+        if (path->length == 0) 
+        {
+            fprintf(stderr, "[path_to_fasta] Trying to print an empty path[1]!\n");
+            return;
+        }
+        fst_node = path->nodes[0];
+    } 
+    else 
+    {
+        if (path->length < 2) 
+        {
+            fprintf(stderr,	"[path_to_fasta] Trying to print an empty path[2]!\n");
+            return;
+        }
+        fst_node = path->nodes[1];
+    }
+
+    // Get the last node
+    dBNode *lst_node = path->nodes[path->length - 1];
+
+    // Make a set of labels for first and last nodes which list the
+    // acceptable forward and reverse path labels
+    char fst_f[5], fst_r[5], lst_f[5], lst_r[5];
+    compute_label(fst_node, forward, fst_f);
+    compute_label(fst_node, reverse, fst_r);
+    compute_label(lst_node, forward, lst_f);
+    compute_label(lst_node, reverse, lst_r);
     
-    //start the recursion!
+    // Output to file
+    fprintf(file_fastg,
+            "\n>node_%qd length:%i average_coverage:%.2f min_coverage:%i max_coverage:%i fst_coverage:%i fst_r:%s fst_f:%s lst_coverage:%i lst_r:%s lst_f:%s\n",
+            path->id,
+            (flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? length + kmer_size : length + kmer_size - 1), avg_coverage,
+            min_coverage,
+            max_coverage,
+            element_get_coverage_all_colours(fst_node),
+            (fst_orientation == forward ? fst_r : fst_f),
+            (fst_orientation == forward ? fst_f : fst_r),
+            element_get_coverage_all_colours(lst_node),
+            (lst_orientation == forward ? lst_r : lst_f),
+            (lst_orientation == forward ? lst_f : lst_r));
+    
+    gfa_file_wrapper file_wrapper;
+    file_wrapper.m_file = file_gfa;
+    file_wrapper.m_segment_count = 0;
+    file_wrapper.m_path_id = path->id;
+    
+    //get starting position
     int start_pos = 0;
     if (flags_check_for_flag(PRINT_FIRST, &(path->flags))) 
     {
@@ -2817,14 +2882,37 @@ void path_to_gfa_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fil
         start_pos = 1;
     }
     int end_pos = path->length;
+
+    //start the recursion!
     fastg_recursion_level = 0;
-    write_paths_between_nodes(path, start_pos, end_pos, graph, NULL, false, true, &gfa_file_wrapper, file_fastg);
+    write_paths_between_nodes(path, start_pos, end_pos, graph, NULL, false, true, &file_wrapper, file_fastg);
 }
 
+/*------------------------------------------------------------------------------------------------------------------------------------------*
+ * Function:        write_paths_between_nodes                                                                                               *
+ * Purpose: Recursive function to write the gfa and fastg entries for section of path between to points, including polymorphisms.           *
+ * Given a path in the graph (the "main path"), this function iterates through each node in the path from start_pos to end_pos.             *
+ * If a node is marked as a polymorphism (i.e. there is a branch) then all other paths from this node are explored.                         *
+ * If any of these paths overlap with the main path, then this is written as an alternative sequence in the fastg and gfa files,            *
+ * and the algorithm is repeated for each subpath (from the branch, to where they join). Then, the algorithm is repeated from               *
+ * the join to the end of the main path.                                                                                                    *
+ * Parameters:      - Path* path                        - Pointer to the path to write a gfa and fastg entry for.                           *
+ *                  - int start_pos                     - The position in the path to start from.                                           *
+ *                  - int end_pos                       - The position in the path to end at.                                               *
+ *                  - dBGraph* graph                    - The graph that contains the path.                                                 *
+ *                  - gfa_segment** previous segment    - Pointer to array of path segments from previous call that join at start_pos.      *
+ *                  - boolean include_last_step         - Whether the last step of the previous path should be included. Used if            *
+ *                                                        previous call resulted in a polymorphism.                                         *
+ *                  - boolean first_path                - Whether this is the first call of this function for path.                         *
+ *                  - gfa_file_wrapper* file_gfa        - Pointer to wrapper for FILE object representing the gfa output file.              *
+ *                  - FILE* file_fastg                  - Pointer to FILE object representing the fastg output file.                        *
+ * Returns: Structure detailing the subpath to the first polymorphism for GFA file.                                                         *
+ *------------------------------------------------------------------------------------------------------------------------------------------*/
 gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dBGraph* graph, gfa_segment** previous_segments, boolean include_last_step, boolean first_path, gfa_file_wrapper* file_gfa, FILE* file_fastg)
 {
-    log_printf("\n--Write paths between nodes for sequence %s, between %i and %i--\n", path->seq, start_pos, end_pos);
+    log_printf("\n--Write paths between nodes for sequence %s, between %i and %i--\n", path->seq, start_pos, (end_pos - 1));
     fastg_recursion_level++;
+    log_printf("Recursion level: %i\n", fastg_recursion_level);
     // Should not be the first path and also from a polymorphism.
     // This is actually pretty ugly, maybe this can be made neater by using more functions.
     assert(!(include_last_step && first_path));
@@ -2842,13 +2930,14 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
     // Is it okay to just have the largest possible path size?
     int max_path_length = 10 * path->length; 
     int main_path = -1;
-            
-    while(current_pos < end_pos)
+    
+    // Go through all the nodes in the path (except the last one) to check for polymorphisms.
+    while(current_pos < end_pos - 1)
     {
         if(path->nodes[current_pos]->flags & POLYMORPHISM)
         {
             log_printf("Potential polymorphism at position %i\n", current_pos);
-            // this node is a candidate for a bubble
+            // this node is a candidate for a polymorphism
             // check every edge leaving this node
             dBNode* current_node = path->nodes[current_pos];
             Orientation orientation = path->orientations[current_pos];
@@ -2869,7 +2958,7 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
                     current_step.orientation = orientation;
                     current_step.flags = 0;
                     
-                    //TODO: do we want to use the perfect path here? This will only find individual SNPs?
+                    //TODO: do we want to use the perfect path here?
                     paths[i] = path_new(max_path_length, graph->kmer_size);
                     log_printf("Creating path %i\n", i);
                     db_graph_get_perfect_path_with_first_edge_all_colours(&current_step, &db_node_action_do_nothing, paths[i], graph);
@@ -2893,11 +2982,10 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
                     {
                         // find the path(s) which overlaps with main path first.
                         // TODO: Can we deal with the case where there are several different paths
-                        // of different lengths? Need to think of a good way to deal with the segments between ends.
-                        log_printf("Recursion level: %i\n", fastg_recursion_level);
-                        overlaps[i] = malloc(sizeof(path_overlap_pair));
+                        // of different lengths? Need to think of a good way to deal with the segments between ends.           
+                        overlaps[i] = malloc(sizeof(path_overlap_pair));                      
+                        log_printf("Checking for overlap between sequences %s and %s from pos %i/%i\n", path->seq, paths[i]->seq, current_pos, path->length - 1);
                         *overlaps[i] = find_first_overlap_from_pos(path, current_pos + 1, paths[i]);
-                        log_printf("Checking for overlap between sequences %s and %s from pos %i/%i\n", path->seq, paths[i]->seq, current_pos + 1, path->length - 1);
                         log_printf("ref overlap: %i/%i,  query overlap: %i/%i\n", overlaps[i]->ref_overlap, path->length-1, overlaps[i]->query_overlap, paths[i]->length - 1);
                         if(overlaps[i]->ref_overlap >= 0 && overlaps[i]->ref_overlap < min_overlap)
                         {
@@ -2927,13 +3015,13 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
                 }
             }
                         
-            assert(main_path != -1);
-            assert(paths[main_path] != NULL);
+           assert(main_path != -1);
+           assert(paths[main_path] != NULL);
                                  
             if(polymorphism)
             {
                 polymorphism_end_pos = min_overlap; 
-                // this is where the two paths join back together
+                // this is where the two paths have the same sequence again after diverging. Note that this is not necessarily at the node they share.
                 // don't forget that paths[main_path] starts at current_pos
                 log_printf("Found joining position %i, main path %i, current pos %i\n", polymorphism_end_pos, main_path, current_pos);
                 overlaps[main_path]->query_overlap = polymorphism_end_pos - current_pos;
@@ -3003,7 +3091,7 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
     current_segment.m_orientation = forward; //path->orientations[current_pos];
     current_segment.m_segment_id = (file_gfa->m_segment_count)++;
     
-    write_gfa_segment(path, &current_segment, file_gfa);
+    write_gfa_segment(&current_segment, file_gfa);
     
     if(previous_segments)
     {
@@ -3011,7 +3099,7 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
         {
             if(previous_segments[i])
             {
-                write_gfa_edge(path, previous_segments[i], &current_segment, file_gfa);
+                write_gfa_edge(previous_segments[i], &current_segment, file_gfa);
             }
         }
     }
@@ -3202,6 +3290,7 @@ path_overlap_pair find_first_overlap_from_pos(const Path* const ref_path, int re
                     assert(ref_path->seq[i-1] == query_path->seq[j-1]);
 
                     // work backwards until we get to the first base that that differs.
+
                     int m = 0;
                     while(ref_path->seq[i-1-m] == query_path->seq[j-1-m])
                     {

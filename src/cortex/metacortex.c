@@ -494,7 +494,7 @@ int main(int argc, char **argv)
                   cmd_line.multiple_subgraph_contigs);
 
 
-                /* Put all of this into a seperate command line call (BUBBLEFIND)*/
+                /* Put all of this into a separate command line call (BUBBLEFIND)*/
                 //db_graph_identify_branches(1000, db_graph);
                 //log_and_screen_printf("\nSearching graph for branches and bubbles...\n");
                 //db_graph_walk_branches(cmd_line.output_fasta_filename, total_max_length, db_graph->kmer_size * 10 + 1, bubble_max_depth, db_graph);

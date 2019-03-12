@@ -129,6 +129,7 @@ Nucleotide coverage_walk_get_best_label_bubble(pathStep * step, dBNode* node, Or
     int bubble_edge = -1;
     dBNode * nodes[4];	// legal? pointing to other nodes that already exist
     Path* paths[4];
+    Orientation orientations[4];
     int i;
 
     // Clear path array
@@ -155,7 +156,8 @@ Nucleotide coverage_walk_get_best_label_bubble(pathStep * step, dBNode* node, Or
             for (j=i+1; j<4; j++){
                 if ((all_coverages[i] > 0) &&
                     (all_coverages[j] > 0) &&
-                    (nodes[i] == nodes[j]))
+                    (nodes[i] == nodes[j]) && 
+                    (orientations[i] == orientations[j])) // Should check orientation is the same too?
                 {
                     log_printf("BUBBLE FOUND IN COVERAGE WALK\n");
                     // Only take the bubble route if sum of paths is better than alternative path
@@ -197,12 +199,15 @@ Nucleotide coverage_walk_get_best_label_bubble(pathStep * step, dBNode* node, Or
             double avg_coverage;
             int min_coverage;
             int max_coverage;
-            int MAX_BRANCH_LENGTH=(db_graph->kmer_size)*2;
+            // TODO: what should this be?
+            int MAX_BRANCH_LENGTH=step->path->max_length;//(db_graph->kmer_size)*2;
 
             current_step.node = node;
             current_step.label = nucleotide;
             current_step.orientation = orientation;
             current_step.flags = 0;
+            
+            // why is this here?
             db_graph_get_next_step(&current_step, &next_step, &reverse_step, db_graph);
 
             paths[nucleotide] = path_new(MAX_BRANCH_LENGTH, db_graph->kmer_size);
@@ -216,6 +221,7 @@ Nucleotide coverage_walk_get_best_label_bubble(pathStep * step, dBNode* node, Or
               all_lengths[nucleotide] = paths[nucleotide]->length;
 
               nodes[nucleotide] = paths[nucleotide]->nodes[paths[nucleotide]->length-1];
+              orientations[nucleotide] = paths[nucleotide]->orientations[paths[nucleotide]->length-1];
               // Add end node to list of nodes to visit
             }
         }

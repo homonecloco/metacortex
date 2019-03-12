@@ -168,6 +168,7 @@ void clear_list(dBGraph* graph)
  * Returns:                                                             *
  *----------------------------------------------------------------------*/
 
+
 int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue, GraphInfo* nodes_in_graph, float delta)
 {
     Queue* nodes_to_walk;
@@ -493,6 +494,12 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
             new_path->length=1;
             * path_length += new_path->length;
             path_destroy(new_path);
+            
+            // is this essentially:
+            //  if (db_node_edge_exist_any_colour(node, n, orientation)) {
+            //      * path_length += 1;
+            //  }
+            // ???
         }
     }
 
@@ -663,6 +670,10 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
             else if (seed_node == NULL) {
                 printf("ERROR: Seed node is NULL, nodes in graph is %d\n", nodes_in_graph->total_size);
             } else if (nodes_in_graph->total_size) {
+                int kmer_size = graph->kmer_size;
+                char kmer_string[kmer_size + 1];
+                binary_kmer_to_seq(&seed_node->kmer, kmer_size, kmer_string);
+                log_printf("Seed node: %s\n", kmer_string);
                 /* enough nodes to bother with? If so, get consensus contig */
                 if (walk_paths && (nodes_in_graph->total_size >= min_subgraph_kmers)) {
 
@@ -688,11 +699,11 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         // NOTE: decision - minimum cov or average cov dictates confidence threshold met?
                         // Output for alternative formats
                         if(fp_contigs_gfa!=NULL){
-                            fprintf(fp_contigs_gfa, "H\tp%qd\n", simple_path->id);
+                            fprintf(fp_contigs_gfa, "H\n");
                         }
                         path_to_fasta(simple_path, fp_contigs_fasta);
                         //path_to_fastg_gfa(simple_path, fp_contigs_fastg, fp_contigs_gfa, graph);
-                        path_to_gfa_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
+                        path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
                         counter++;
                     } else {
                         log_printf("Didn't write path of size %d\n", simple_path->length);
