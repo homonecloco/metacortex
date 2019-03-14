@@ -2924,6 +2924,25 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
         paths[i] = NULL;
         overlaps[i] = NULL;
     }
+    
+    void destroy_paths_and_overlaps()
+    {
+        //destroy the paths and overlaps
+        for(int i = 0; i < 4; i++)
+        {
+            if(paths[i])
+            {
+                // we are done with this path now
+                path_destroy(paths[i]);
+                paths[i] = NULL;
+            }
+            if(overlaps[i])
+            {
+                free(overlaps[i]);
+                overlaps[i] = NULL;
+            }
+        }
+    }
     boolean polymorphism = false;
     int polymorphism_end_pos = -1;
     // TODO: Come up with a sensible value for this. What if there is a mega-insertion?
@@ -3024,6 +3043,7 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
                 // this is where the two paths have the same sequence again after diverging. Note that this is not necessarily at the node they share.
                 // don't forget that paths[main_path] starts at current_pos
                 log_printf("Found joining position %i, main path %i, current pos %i\n", polymorphism_end_pos, main_path, current_pos);
+                assert(polymorphism_end_pos >= current_pos);
                 overlaps[main_path]->query_overlap = polymorphism_end_pos - current_pos;
                 break;
             }
@@ -3126,8 +3146,9 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
         // get sequence from main path (except for the last k)
         if(fastg_recursion_level == 1)
         {
-            log_printf("Writing sequence to fastg");
+            log_printf("Writing sequence to fastg\n");
             int main_seq_length = overlaps[main_path]->query_overlap;//strlen(paths[main_path]->seq);// - path->kmer_size;
+            log_printf("Main seq length: %i\n", main_seq_length);
             assert(main_seq_length >= 0);
             char main_seq[main_seq_length + 1];
             strncpy(main_seq, paths[main_path]->seq, main_seq_length);
@@ -3190,20 +3211,7 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
         }
 
         //destroy the paths and overlaps
-        for(int i = 0; i < 4; i++)
-        {
-            if(paths[i])
-            {
-                // we are done with this path now
-                path_destroy(paths[i]);
-                paths[i] = NULL;
-            }
-            if(overlaps[i])
-            {
-                free(overlaps[i]);
-                overlaps[i] = NULL;
-            }
-        }
+        destroy_paths_and_overlaps();
     
         // All return segments finish at the same place, end_node, so we continue from there.      
         int new_start_pos = polymorphism_end_pos;
@@ -3290,9 +3298,11 @@ path_overlap_pair find_first_overlap_from_pos(const Path* const ref_path, int re
                     assert(ref_path->seq[i-1] == query_path->seq[j-1]);
 
                     // work backwards until we get to the first base that that differs.
-
+                    // don't go before the ref start pos!
                     int m = 0;
-                    while(ref_path->seq[i-1-m] == query_path->seq[j-1-m])
+                    while(  j- m > 0 && 
+                            i - m > ref_path_start_pos && 
+                            ref_path->seq[i-1-m] == query_path->seq[j-1-m])
                     {
                         m++;
                     }
