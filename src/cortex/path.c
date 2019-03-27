@@ -2760,7 +2760,7 @@ void path_counts_add(Path * p, PathCounts * pc)
 
 void write_gfa_segment(const gfa_segment* const segment, gfa_file_wrapper* gfa_file)
 {
-    fprintf(gfa_file->m_file, "S\tp%qds%i\t%lu\t%s\n", 
+    fprintf(gfa_file->m_file, "S\tp%llds%i\t%lu\t%s\n", 
                         gfa_file->m_path_id,
                         segment->m_segment_id, 
                         strlen(segment->m_nucleotide_sequence), 
@@ -2771,10 +2771,10 @@ void write_gfa_edge(const gfa_segment* const first_segment, const gfa_segment* c
 {
     assert(first_segment != NULL);
     assert(second_segment != NULL);
-    int first_length = strlen(first_segment->m_nucleotide_sequence);
+    long unsigned first_length = strlen(first_segment->m_nucleotide_sequence);
     char first_orientation = first_segment->m_orientation == forward ? '+' : '-';
     char second_orientation = second_segment->m_orientation == forward ? '+' : '-';
-    fprintf(gfa_file->m_file, "E\tp%qds%i_p%qds%i\tp%qds%i%c\tp%qds%i%c\t%lu$\t%lu$\t0\t0\t*\n",
+    fprintf(gfa_file->m_file, "E\tp%llds%i_p%llds%i\tp%llds%i%c\tp%llds%i%c\t%lu$\t%lu$\t0\t0\t*\n",
                         gfa_file->m_path_id, first_segment->m_segment_id, gfa_file->m_path_id, second_segment->m_segment_id,
                         gfa_file->m_path_id, first_segment->m_segment_id, first_orientation,
                         gfa_file->m_path_id, second_segment->m_segment_id, second_orientation,
@@ -2885,7 +2885,8 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
 
     //start the recursion!
     fastg_recursion_level = 0;
-    write_paths_between_nodes(path, start_pos, end_pos, graph, NULL, false, true, &file_wrapper, file_fastg);
+    gfa_segment final_segment = write_paths_between_nodes(path, start_pos, end_pos, graph, NULL, false, true, &file_wrapper, file_fastg);
+    free(final_segment.m_nucleotide_sequence);
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------------------*
@@ -3072,7 +3073,7 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
         // add the initial k-mer to the first sequence in the path
         sequence_length += path->kmer_size;
     }
-    char sequence[sequence_length + 1];
+    char* sequence = malloc(sizeof(char) * (sequence_length + 1));
     if(first_path)
     {
         char kmer_string[path->kmer_size + 1];
@@ -3107,8 +3108,7 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
     }
     sequence[sequence_length] = '\0';
     current_segment.m_nucleotide_sequence = sequence;
-    //TODO: should this be the orientation from the DB graph, or is it just for GFA purposes?
-    current_segment.m_orientation = forward; //path->orientations[current_pos];
+    current_segment.m_orientation = forward;
     current_segment.m_segment_id = (file_gfa->m_segment_count)++;
     
     write_gfa_segment(&current_segment, file_gfa);
@@ -3225,6 +3225,7 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
             include_last_step = true;
         }
         
+        free(current_segment.m_nucleotide_sequence);
         // TODO ...there must be a better way of doing this
         fastg_recursion_level--;
         // If new_start_pos is the last node in the path, then there are no more sequences!
@@ -3238,6 +3239,7 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
         {
             if(return_segments[i])
             {
+                free(return_segments[i]->m_nucleotide_sequence);
                 free(return_segments[i]);
                 return_segments[i] = NULL;
             }
