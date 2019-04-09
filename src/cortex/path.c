@@ -2885,8 +2885,7 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
 
     //start the recursion!
     fastg_recursion_level = 0;
-    gfa_segment final_segment = write_paths_between_nodes(path, start_pos, end_pos, graph, NULL, false, true, &file_wrapper, file_fastg);
-    free(final_segment.m_nucleotide_sequence);
+    write_paths_between_nodes(path, start_pos, end_pos, graph, NULL, false, true, &file_wrapper, file_fastg);
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------------------*
@@ -3184,7 +3183,8 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
         {
             if(paths[i])
             {
-                 log_printf("Starting recursion for path %i\n", i);
+                log_printf("--------------------------\n");
+                log_printf("Starting recursion for path %i\n", i);
                 // TODO: path[i] is a perfect path, so shouldn't have any polymorphisms?
                 // maybe we can use a different path instead so that we can look for polymorphism along this path.
                 
@@ -3196,12 +3196,18 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
                 if(end_pos > 0)
                 {                 
                     *return_segments[i] = write_paths_between_nodes(paths[i], 1, end_pos, graph, current_segment_array, true, false, file_gfa, file_fastg);
+                    // free the current segment memory now that the new segments are joined to it in the output files.
                 }
                 else
                 {
                     // In this case we have an indel, so we need to join the current segment to the next one.
-                    // Just make a copy so that we can free this pointer later.
-                    *return_segments[i] = current_segment;
+                    // Deep copy the struct because the sequence string because it will be freed soon,
+                    // and this is simpler than trying to keep track of pointers.
+                    return_segments[i]->m_orientation = current_segment.m_orientation;
+                    return_segments[i]->m_segment_id = current_segment.m_segment_id;
+                    size_t size = sizeof(char) * (sequence_length + 1);
+                    return_segments[i]->m_nucleotide_sequence = (char *) malloc(size);
+                    memcpy(return_segments[i]->m_nucleotide_sequence, current_segment.m_nucleotide_sequence, size);
                 }
             }
             else
@@ -3209,10 +3215,16 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
                 return_segments[i] = NULL;
             }
         }
+        log_printf("--------------------------\n");
 
         //destroy the paths and overlaps
+        log_printf("Destroy paths and overlaps\n");
         destroy_paths_and_overlaps();
+        // free the array holding the current segment
+        log_printf("free current segment string\n");
+        free(current_segment.m_nucleotide_sequence);
     
+        log_printf("Continuing from pos %i\n", polymorphism_end_pos);
         // All return segments finish at the same place, end_node, so we continue from there.      
         int new_start_pos = polymorphism_end_pos;
         boolean include_last_step = false;
@@ -3225,15 +3237,15 @@ gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, dB
             include_last_step = true;
         }
         
-        free(current_segment.m_nucleotide_sequence);
         // TODO ...there must be a better way of doing this
         fastg_recursion_level--;
         // If new_start_pos is the last node in the path, then there are no more sequences!
         gfa_segment end;
-        if(new_start_pos < end_pos - 1)
+        if(new_start_pos <= end_pos - 1)
         {
             end = write_paths_between_nodes(path, new_start_pos, end_pos, graph, return_segments, include_last_step, false, file_gfa, file_fastg);
         }
+  
         // destroy the return segments
         for(int i = 0; i < 4; i++)
         {
@@ -3302,8 +3314,8 @@ path_overlap_pair find_first_overlap_from_pos(const Path* const ref_path, int re
                     // work backwards until we get to the first base that that differs.
                     // don't go before the ref start pos!
                     int m = 0;
-                    while(  j- m > 0 && 
-                            i - m > ref_path_start_pos && 
+                    while(  j- m >= 0 && 
+                            i - m >= ref_path_start_pos && 
                             ref_path->seq[i-1-m] == query_path->seq[j-1-m])
                     {
                         m++;
