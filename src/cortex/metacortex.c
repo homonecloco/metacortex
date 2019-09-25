@@ -528,8 +528,8 @@ void print_graph(dBGraph * db_graph)
 			short kmer_size = db_graph->kmer_size;
 			binary_kmer_assignment_operator(tmp, node->kmer);
 			binary_kmer_reverse_complement(&tmp, kmer_size, &co);
-			char seq[kmer_size], seqNext[kmer_size],
-			    seq1[kmer_size];
+			char seq[kmer_size + 1], seqNext[kmer_size + 1],
+			    seq1[kmer_size + 1];
 			binary_kmer_to_seq(&tmp, kmer_size, seq1);
 			char *print = db_node_check_for_any_flag(node,
 								 STARTING_FORWARD

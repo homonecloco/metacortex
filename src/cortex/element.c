@@ -209,8 +209,8 @@ Orientation db_node_get_orientation(BinaryKmer * k, dBNode * e, short kmer_size)
     
     printf
     ("programming error - you have called  db_node_get_orientation with a kmer that is neither equal to the kmer in this node, nor its rev comp\n");
-    char tmpseq1[kmer_size];
-    char tmpseq2[kmer_size];
+    char tmpseq1[kmer_size + 1];
+    char tmpseq2[kmer_size + 1];
     printf("Arg 1 Kmer is %s and Arg 2 node kmer is %s\n",
            binary_kmer_to_seq(k, kmer_size, tmpseq1),
            binary_kmer_to_seq(&(e->kmer), kmer_size, tmpseq2));
