@@ -282,4 +282,8 @@ Nucleotide db_graph_get_best_next_step_nucleotide(dBNode * from, dBNode * previo
 
 void db_graph_calculate_stats(dBGraph * db_graph);
 
+pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep * first_step, Path * path, dBGraph * db_graph);
+
+boolean get_next_step_by_coverage_all_colours(pathStep* current_step, pathStep* next_step, pathStep* rev_step, dBGraph * graph);
+
 #endif /* DB_GRAPH_H_ */

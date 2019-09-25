@@ -60,6 +60,7 @@
  ************************************************************************/
 
 #include <open_hash/hash_table.h>
+#include "gfa_segment.h"
 
 #ifndef PATH_H_
 #define PATH_H_
@@ -116,6 +117,8 @@
 #define PATH_STEP_ALL_VISITED  ( 15)     //x0000 000F
 #define PRINT_LABEL_AS_N       (1 <<  4) //x0000 0010
 #define PRINT_LABEL_LOWERCASE  (1 <<  5) //x0000 0020
+
+#define MAX_GFA_RECURSIONS 2
 
 
 typedef enum  {NONE = 0,  FIRST = 1, LAST = 2 }PathEnd ;
@@ -421,6 +424,11 @@ boolean is_step_marked_as_uncertain(int i, Path * path);
 
 void path_mark_as_visited(Path* path);
 
+void path_mark_path_with_flag(Path* path, Flags f);
+
+void path_unmark_path_with_flag(Path* path, Flags f);
+
+
 void path_pairs_to_fasta(PathArray* pa, int distances[], FILE* fout);
 
 void * initalise_gfa_stats(gfa_stats * gfa, int max_length);
@@ -435,27 +443,22 @@ void post_polymorph_L_lines(FILE * f, gfa_stats * gfa);
 
 void add_to_P_line(gfa_stats * gfa);
 
-typedef struct {
-    int m_segment_id;
-    char* m_nucleotide_sequence;
-    Orientation m_orientation;
-} gfa_segment;
+void write_fastg_alt(const char* sequence1, const char* sequence2, FILE* file_fastg);
 
-typedef struct {
-    FILE* m_file;
-    int m_segment_count;
-    long long m_path_id;
-} gfa_file_wrapper;
+gfa_segment_array* write_paths_between_nodes(Path* path, int start_pos, int end_pos, HashTable* graph, gfa_segment_array* previous_segments, boolean skip_first, gfa_file_wrapper* file_gfa, FILE* file_fastg);
 
-typedef struct {
-    int query_overlap;
-    int ref_overlap;
-} path_overlap_pair;
-
-void write_gfa_segment(const gfa_segment* const segment, gfa_file_wrapper* gfa_file);
-void write_gfa_edge(const gfa_segment* const first_segment, const gfa_segment* const second_segment, gfa_file_wrapper* gfa_file);
-gfa_segment write_paths_between_nodes(Path* path, int start_pos, int end_pos, HashTable* graph, gfa_segment** previous_segments, boolean include_last_step, boolean first_path, gfa_file_wrapper* file_gfa, FILE* file_fastg);
 void path_to_gfa2_and_fastg(Path* path, HashTable* graph, FILE* file_gfa, FILE* file_fastg);
-path_overlap_pair find_first_overlap_from_pos(const Path* const ref_path, int ref_path_start_pos, const Path* const query_path);
+
 int fastg_recursion_level;
+
+typedef struct
+{
+    int m_join_pos;
+    int m_length;
+    Nucleotide m_nucleotide;
+    Path* m_path;
+}   subpath;
+
+void sort_subpaths(subpath* a);
+
 #endif /* PATH_H_ */

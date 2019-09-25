@@ -132,7 +132,7 @@ pathStep *db_graph_get_next_step(pathStep * current_step, pathStep * next_step, 
     else {
     //		if (DEBUG) {
     //
-    char tmpseq[db_graph->kmer_size];
+    char tmpseq[db_graph->kmer_size + 1];
     printf("[db_graph_get_next_step] Cannot find %s so get a NULL node\n", binary_kmer_to_seq(&tmp_kmer, db_graph->kmer_size, tmpseq));
     //Commented by ricardo, to reduce the log as for the traversing
     //      algorithm relays on having this as null
@@ -191,7 +191,7 @@ pathStep *db_graph_get_next_step_with_reverse(pathStep * current_step, pathStep 
 	else {
         //		if (DEBUG) {
         //
-        char tmpseq[db_graph->kmer_size];
+        char tmpseq[db_graph->kmer_size + 1];
         printf("[db_graph_get_next_step] Cannot find %s so get a NULL node\n",
                binary_kmer_to_seq(&tmp_kmer, db_graph->kmer_size, tmpseq));
         //Commented by ricardo, to reduce the log as for the traversing
@@ -452,7 +452,7 @@ int db_graph_supernode(dBNode * node, void (*node_action) (dBNode * node), Path 
 void printNode(dBNode * dbn, short int kmerSize)
 {
 	if (dbn != NULL) {
-		char seq1[kmerSize];
+		char seq1[kmerSize + 1];
 		printf("MemAdd:\%p\n", dbn);
 		printf("Node:\t%s \n",
 		       binary_kmer_to_seq(&(dbn->kmer), kmerSize, seq1));
@@ -1158,7 +1158,7 @@ void db_graph_write_graphviz_file(char *filename, dBGraph * db_graph)
 			short kmer_size = db_graph->kmer_size;
 			binary_kmer_assignment_operator(tmp, node->kmer);
 			binary_kmer_reverse_complement(&tmp, kmer_size, &co);
-			char seq[kmer_size], seqNext[kmer_size], seq1[kmer_size];
+			char seq[kmer_size + 1], seqNext[kmer_size + 1], seq1[kmer_size + 1];
 			binary_kmer_to_seq(&tmp, kmer_size, seq1);
 			char *print = db_node_check_for_any_flag(node, STARTING_FORWARD  | BRANCH_NODE_FORWARD | BRANCH_NODE_REVERSE | END_NODE_FORWARD | END_NODE_REVERSE | X_NODE) ? "ellipse" : "ellipse";
 			char *node_colour = "black";
@@ -1285,6 +1285,163 @@ Nucleotide db_graph_get_best_next_step_nucleotide(dBNode * from, dBNode * previo
 }
 
 
+/**
+ * Walk along the graph from first_step until we arrive at a node with the flag PATH_FOR_GFA.
+ * At branching points, the branch to the node with highest coverage is taken.
+ * @param first_step - the first step for the new path.
+ * @param path - pointer to where the new path will be stored.
+ * @param db_graph
+ * @return A pathStep object to represent the node and orientation of where the path joins.
+ */
+pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep* first_step, Path* new_path, dBGraph* db_graph)
+{
+    assert(main_path != NULL && new_path != NULL);
+    path_reset(new_path);
+    path_mark_path_with_flag(main_path, PATH_FOR_GFA);
+    
+    pathStep null_step;
+    null_step.node = NULL;
+    null_step.orientation = undefined;
+    null_step.label = undefined;
+    
+    pathStep current_step, next_step, rev_step;
+    path_step_assign(&current_step, first_step);
+    path_step_assign(&rev_step, first_step);
+    db_graph_get_next_step(&current_step, &next_step, &rev_step, db_graph);
+    boolean on_path = false;
+    while(!on_path)
+    {
+        log_printf("Starting check for flag.\n");
+        while(!flags_check_for_flag(PATH_FOR_GFA, &(next_step.node->flags)))
+        {
+            boolean added = false;
+            assert(current_step.label != Undefined);
+            added = path_add_node(&current_step, new_path);
+            
+            if(added) 
+            {
+                log_printf("[db_graph_get_highest_coverage_bubble] Added node %i to path.\n", next_step.node);
+                path_step_assign(&current_step, &next_step);
+                path_step_assign(&rev_step, &current_step);
+                if(!get_next_step_by_coverage_all_colours(&current_step, &next_step, &rev_step, db_graph))
+                {
+                    return null_step;
+                }
+                
+                //sanity check
+                assert(next_step.node != NULL);
+                if(next_step.node == current_step.node && next_step.orientation == current_step.orientation)
+                {
+                    log_printf("[db_graph_get_highest_coverage_bubble] Repeat in path at base %c .\n", binary_nucleotide_to_char(next_step.label));
+                }
+            } 
+            else 
+            {
+                // If not added (we ran out of space), then remove the last node and make it's label undefined...
+                pathStep ps;
+                path_get_last_step(&ps, new_path);
+                ps.label = Undefined;
+                path_remove_last(new_path);
+                path_add_node(&ps, new_path);
+                log_printf("[db_graph_get_highest_coverage_bubble] Could not add node to path %s, returning NULL.\n", new_path->seq);
+                return null_step;
+            }
+        }
+        //log_printf("Flag found.\n");
+        path_add_node(&current_step, new_path);
+        
+        // check that we have the same orientation as the path for this node.
+        for(int i = 0; i < main_path->length; i++)
+        {
+            if(next_step.node == main_path->nodes[i] && next_step.orientation == main_path->orientations[i])
+            {
+                assert((main_path->nodes[i]->flags & PATH_FOR_GFA) !=0);
+                on_path = true;
+                break;
+            }
+        }
+        
+        if(!on_path)
+        {
+            path_step_assign(&current_step, &next_step);
+            path_step_assign(&rev_step, &current_step);
+            get_next_step_by_coverage_all_colours(&current_step, &next_step, &rev_step, db_graph);
+            log_printf("[db_graph_get_highest_coverage_bubble] Not on path. Reversing.\n");
+        }
+        
+        if(path_is_cycle(new_path))
+        {
+            log_printf("[db_graph_get_highest_coverage_bubble] Path is loop.\n");
+            return null_step;
+        }
+    }
+    //log_printf("[db_graph_get_highest_coverage_bubble] Returning path with seq %s, length %i.\n", new_path->seq, new_path->length);
+    path_unmark_path_with_flag(main_path, PATH_FOR_GFA);
+    return next_step;
+}
+
+
+/**
+ * Get the next step in graph based on highest coverage.
+ * @param current_step - label should be undefined.
+ * @param next_step - pointer to next step, will be filled.
+ * @param rev_step - pointer to the reverse step.
+ * @param graph
+ * @return successful
+ */
+boolean get_next_step_by_coverage_all_colours(pathStep* current_step, pathStep* next_step, pathStep* rev_step, dBGraph * graph)
+{
+    assert(current_step != NULL && next_step != NULL && rev_step != NULL);
+    int max_coverage = 0;
+    Nucleotide best_label = undefined;
+    
+    for(Nucleotide base = 0; base < 4; base++) 
+    {
+        pathStep step_for_label;
+        dBNode* node = current_step->node;
+        if(db_node_edge_exist_any_colour(node, base, current_step->orientation))
+        {
+            current_step->label = base;
+            pathStep temp_reverse_step;
+            db_graph_get_next_step(current_step, &step_for_label, &temp_reverse_step, graph);
+            if( step_for_label.node != NULL && 
+                !(step_for_label.node == rev_step->node && step_for_label.orientation == rev_step->orientation) &&
+                !(step_for_label.node == current_step->node && step_for_label.orientation == current_step->orientation) )
+            {
+                int coverage = element_get_coverage_all_colours(step_for_label.node);
+                
+                char kmer_string[graph->kmer_size + 1];
+                kmer_string[graph->kmer_size] = '\0';
+                BinaryKmer kmer; 
+                binary_kmer_assignment_operator(kmer, *element_get_kmer(step_for_label.node));
+                binary_kmer_to_seq(&kmer, graph->kmer_size, kmer_string);    
+                //log_printf("[get_next_step_by_coverage_all_colours] Found coverage for node %s\n", kmer_string);
+                        
+                if(coverage > max_coverage)
+                {
+                    max_coverage = coverage;
+                    best_label = base;
+                    next_step->node = step_for_label.node;
+                    next_step->orientation = step_for_label.orientation;
+                }
+            }
+        }               
+    }
+    
+    char kmer_string[graph->kmer_size + 1];
+    kmer_string[graph->kmer_size] = '\0';
+    BinaryKmer kmer; 
+    binary_kmer_assignment_operator(kmer, *element_get_kmer(current_step->node));
+    binary_kmer_to_seq(&kmer, graph->kmer_size, kmer_string);    
+        
+    if(best_label == Undefined)
+    {
+        log_printf("[get_next_step_by_coverage_all_colours] Could not find path from node %s\n", kmer_string);
+        return false;
+    }
+    current_step->label = best_label;
+    return true;
+}
 
 
 #ifdef DEBUG_CLEANUP
