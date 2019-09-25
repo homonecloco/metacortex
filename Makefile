@@ -1,5 +1,7 @@
 all		: metacortex
 
+export CC=/usr/local/Cellar/gcc/9.1.0/bin/gcc-9
+
 ifndef CC
   CC = gcc
 endif
@@ -84,7 +86,7 @@ ifdef 32_BITS
 endif
 
 # Compiler options
-OPT		= $(ARCH) -Wall -O3 -DNUMBER_OF_BITFIELDS_IN_BINARY_KMER=$(BITFIELDS) -pthread -g
+OPT		= $(ARCH) -Wall -O3 -DNUMBER_OF_BITFIELDS_IN_BINARY_KMER=$(BITFIELDS) -pthread -g -fsanitize=address
 #-Wno-duplicate-decl-specifier
 
 ifdef DEBUG
@@ -110,7 +112,7 @@ CFLAGS_METACORTEX_TESTS	= -I$(IDIR_CUNIT) $(CFLAGS_CUNIT) -I$(IDIR_BASIC) -I$(ID
 CFLAGS_BASIC_TESTS = -I$(IDIR_CUNIT) $(CFLAGS_CUNIT) -I$(IDIR_BASIC) -I$(IDIR_BASIC_TESTS)
 
 # Program objects
-METACORTEX_OBJ = obj/cortex/file_format.o obj/cortex/flags.o obj/cortex/cleaning.o obj/cortex/path.o obj/cortex/perfect_path.o obj/cortex/branches.o obj/cortex/y_walk.o obj/cortex/cmd_line.o obj/cortex/binary_kmer.o obj/cortex/seq.o obj/cortex/element.o obj/cortex/hash_value.o obj/cortex/hash_table.o obj/cortex/dB_graph.o obj/cortex/file_reader.o obj/cortex/metacortex.o obj/cortex/logger.o obj/cortex/metagraphs.o obj/cortex/coverage_walk.o obj/util/node_queue.o obj/cortex/graph_stats.o obj/cortex/bubble_find.o obj/cortex/report_output.o
+METACORTEX_OBJ = obj/cortex/file_format.o obj/cortex/flags.o obj/cortex/cleaning.o obj/cortex/path.o obj/cortex/perfect_path.o obj/cortex/branches.o obj/cortex/y_walk.o obj/cortex/cmd_line.o obj/cortex/binary_kmer.o obj/cortex/seq.o obj/cortex/element.o obj/cortex/hash_value.o obj/cortex/hash_table.o obj/cortex/dB_graph.o obj/cortex/file_reader.o obj/cortex/metacortex.o obj/cortex/logger.o obj/cortex/metagraphs.o obj/cortex/coverage_walk.o obj/util/node_queue.o obj/cortex/graph_stats.o obj/cortex/bubble_find.o obj/cortex/report_output.o obj/util/gfa_segment.o
 KMERINFO_OBJ =  obj/cortex/flags.o obj/cortex/path.o obj/cortex/binary_kmer.o obj/cortex/seq.o obj/cortex/element.o obj/cortex/hash_table.o obj/cortex/file_reader.o obj/util/kmerinfo.o obj/cortex/logger.o obj/cortex/hash_value.o
 GRAPHOUT_OBJ = obj/cortex/flags.o obj/cortex/path.o obj/cortex/binary_kmer.o obj/cortex/seq.o obj/cortex/element.o obj/cortex/hash_table.o obj/cortex/file_reader.o obj/cortex/dB_graph.o obj/util/graphout.o obj/cortex/perfect_path.o obj/cortex/logger.o obj/cortex/hash_value.o obj/util/graph_formats.o obj/util/node_queue.o obj/cortex/cleaning.o obj/cortex/coverage_walk.o obj/util/graph_tools.o obj/cortex/file_format.o
 FILTERREADS_OBJ = obj/util/filter_reads.o obj/cortex/flags.o obj/cortex/path.o obj/cortex/binary_kmer.o obj/cortex/seq.o obj/cortex/element.o obj/cortex/hash_table.o obj/cortex/file_reader.o obj/cortex/dB_graph.o obj/cortex/perfect_path.o obj/cortex/logger.o obj/cortex/hash_value.o obj/util/node_queue.o obj/cortex/cleaning.o obj/cortex/file_format.o
@@ -202,6 +204,9 @@ obj/util/graph_tools.o : src/util/graph_tools.c
 	mkdir -p obj/util;  $(CC) $(CFLAGS_GRAPHOUT) $(OPT) -c $? -o $@
 
 obj/util/node_queue.o : src/util/node_queue.c
+	mkdir -p obj/util;  $(CC) $(CFLAGS_GRAPHOUT) $(OPT) -c $? -o $@
+
+obj/util/gfa_segment.o : src/util/gfa_segment.c
 	mkdir -p obj/util;  $(CC) $(CFLAGS_GRAPHOUT) $(OPT) -c $? -o $@
 
 obj/util/kmerinfo.o : src/util/kmerinfo.c
