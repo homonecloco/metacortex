@@ -309,7 +309,7 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
 
     // Start a queue of nodes to walk
     //log_and_screen_printf("Allocating %d Mb to store queue information (max %d nodes, when full each node could be %d)...\n", ((METACORTEX_QUEUE_SIZE * sizeof(QueueItem*)) / 1024) / 1024, METACORTEX_QUEUE_SIZE, sizeof(QueueItem));
-    nodes_to_walk = queue_new(METACORTEX_QUEUE_SIZE);
+    nodes_to_walk = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!nodes_to_walk) {
         log_and_screen_printf("Couldn't get memory for node queue.\n");
         exit(-1);
@@ -589,7 +589,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
         }
     } // stats_traversal()
 
-    graph_queue = queue_new(METACORTEX_QUEUE_SIZE);
+    graph_queue = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!graph_queue) {
         log_and_screen_printf("Couldn't get memory for graph queue.\n");
         exit(-1);
@@ -703,7 +703,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         }
                         path_to_fasta(simple_path, fp_contigs_fasta);
                         //path_to_fastg_gfa(simple_path, fp_contigs_fastg, fp_contigs_gfa, graph);
-                        path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
+                        //path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
                         counter++;
                     } else {
                         log_printf("Didn't write path of size %d\n", simple_path->length);
@@ -1035,7 +1035,7 @@ int explore_subgraphs(dBNode* start_node, dBGraph* graph, GraphInfo* nodes_in_gr
 
     // Start a queue of nodes to walk
     //log_and_screen_printf("Allocating %d Mb to store queue information (max %d nodes, when full each node could be %d)...\n", ((METACORTEX_QUEUE_SIZE * sizeof(QueueItem*)) / 1024) / 1024, METACORTEX_QUEUE_SIZE, sizeof(QueueItem));
-    nodes_to_walk = queue_new(METACORTEX_QUEUE_SIZE);
+    nodes_to_walk = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!nodes_to_walk) {
         log_and_screen_printf("Couldn't get memory for node queue.\n");
         exit(-1);

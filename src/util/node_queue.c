@@ -69,12 +69,14 @@
 #include "binary_kmer.h"
 #include "flags.h"
 #include "element.h"
+#include "path.h"
 #include "node_queue.h"
+
 
 /*----------------------------------------------------------------------*
  * General purpose queue functions                                      *
  *----------------------------------------------------------------------*/
-Queue* queue_new(int n)
+Queue* queue_new(int n, size_t item_size)
 {
 	Queue* q = calloc(1, sizeof(Queue));
     if (!q) {
@@ -84,7 +86,7 @@ Queue* queue_new(int n)
         //printf("Allocated!\n");
     }
 	q->max_size = n;
-	q->items = calloc(n, sizeof(QueueItem*));
+	q->items = calloc(n, item_size);
     if (!q->items) {
         printf("Couldn't get memory for queue items\n");
         exit(1);
@@ -146,6 +148,11 @@ void queue_free(Queue *q)
 /*----------------------------------------------------------------------*
  * Queue wrappers for nodes                                             *
  *----------------------------------------------------------------------*/
+Queue* node_queue_new(int n)
+{
+    size_t item_size = sizeof(QueueItem*);
+    return queue_new(n, item_size);
+}
 QueueItem* queue_push_node(Queue* q, dBNode* n, int d)
 {
 	QueueItem* item = malloc(sizeof(QueueItem));
@@ -185,4 +192,25 @@ dBNode* queue_pop_node(Queue* q, int* d)
 	}
 
 	return node;
+}
+
+/*----------------------------------------------------------------------*
+ * Queue wrappers for pathSteps                                             *
+ *----------------------------------------------------------------------*/
+pathStep* queue_push_step(Queue* q, pathStep* step)
+{
+	pathStep* item = malloc(sizeof(pathStep));
+        item->flags = step->flags;
+        item->label = step->label;
+        item->node = step->node;
+        item->orientation = step->orientation;
+        item->path = step->path;
+
+	return queue_push(q, item);
+}
+
+pathStep* queue_pop_step(Queue* q)
+{
+	pathStep* step = queue_pop(q);
+	return step;
 }

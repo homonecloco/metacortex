@@ -140,7 +140,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
 
     // Start a queue of nodes to walk
     //log_and_screen_printf("Allocating %d Mb to store queue information (max %d nodes, when full each node could be %d)...\n", ((METACORTEX_QUEUE_SIZE * sizeof(QueueItem*)) / 1024) / 1024, METACORTEX_QUEUE_SIZE, sizeof(QueueItem));
-    nodes_to_walk = queue_new(METACORTEX_QUEUE_SIZE);
+    nodes_to_walk = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!nodes_to_walk) {
         log_and_screen_printf("Couldn't get memory for node queue.\n");
         exit(-1);
@@ -194,7 +194,7 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
     int n_seeds = 0;
     int counter= 0;
 
-    graph_queue = queue_new(METACORTEX_QUEUE_SIZE);
+    graph_queue = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!graph_queue) {
         log_and_screen_printf("Couldn't get memory for graph queue.\n");
         exit(-1);

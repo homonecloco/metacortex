@@ -24,7 +24,7 @@ typedef struct {
 /*----------------------------------------------------------------------*
  * General purpose queue functions                                      *
  *----------------------------------------------------------------------*/
-Queue* queue_new(int n);
+Queue* queue_new(int n, size_t item_size);
 void* queue_push(Queue* q, void* item);
 void* queue_pop(Queue* q);
 void queue_free(Queue *q);
@@ -32,5 +32,12 @@ void queue_free(Queue *q);
 /*----------------------------------------------------------------------*
  * Queue wrappers for nodes                                             *
  *----------------------------------------------------------------------*/
+Queue* node_queue_new(int n);
 QueueItem* queue_push_node(Queue* q, dBNode* n, int d);
 dBNode* queue_pop_node(Queue* q, int* d);
+
+/*----------------------------------------------------------------------*
+ * Queue wrappers for pathSteps                                         *
+ *----------------------------------------------------------------------*/
+pathStep* queue_push_step(Queue* q, pathStep* step);
+pathStep* queue_pop_step(Queue* q);
