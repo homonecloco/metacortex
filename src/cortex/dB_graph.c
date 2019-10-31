@@ -79,6 +79,7 @@
 #include <path.h>
 #include <perfect_path.h>
 #include <logger.h>
+#include <node_queue.h>
 
 /**
  * Returns the next node, and the reverse to come back.
@@ -371,7 +372,8 @@ int db_graph_get_perfect_path_with_first_edge_all_colours(pathStep * first_step,
             ps.label = Undefined;
             path_remove_last(path);
             path_add_node(&ps, path);
-            if (DEBUG) {
+            if (DEBUG) 
+            {
                 printf("[db_graph_get_perfect_path_with_first_edge_all_colours] Trying to correct last label failed.\n");
             }
         }
@@ -385,7 +387,8 @@ int db_graph_get_perfect_path_with_first_edge_all_colours(pathStep * first_step,
                 db_node_has_precisely_one_edge_all_colours(next_step.node, next_step.orientation, &next_step.label)))
         {
             next_step.label = Undefined;
-            if (DEBUG) {
+            if (DEBUG) 
+            {
                 printf("[db_graph_get_perfect_path_with_first_edge_all_colours] Changing last label to 'N'.\n");
             }
         }
@@ -1284,7 +1287,314 @@ Nucleotide db_graph_get_best_next_step_nucleotide(dBNode * from, dBNode * previo
     return best;
 }
 
+pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_graph)
+{
+    log_printf("[get_path_to_junction] Starting get_path_to_junction.\n");
+   
+    // don't add first step
+    pathStep return_step;
+    return_step.node = NULL;
+    return_step.label = Undefined;
+    
+    Nucleotide current_reverse;
+    Orientation current_orientation;
+    dBNode* current_node = db_graph_get_next_node(first_step->node, first_step->orientation, &current_orientation, first_step->label, 
+                                                &current_reverse, db_graph);
+    
+    int num_edges = db_node_edges_count_all_colours(current_node, current_orientation);
+    while(num_edges < 2)
+    {
+        if(current_orientation == forward)
+        {
+            if(flags_check_for_flag(CURRENT_PATH_FORWARD, &(current_node->flags)))
+            {
+                log_printf("[get_path_to_junction] Already visited this node. Returning NULL.\n");
+                return return_step;
+            }
+            if(flags_check_for_flag(PATH_FOR_GFA_FORWARD, &(current_node->flags)))
+            {
+                break;
+            }
+            flags_action_set_flag(CURRENT_PATH_FORWARD, &current_node->flags);
+        }
+        else
+        {
+            if(flags_check_for_flag(CURRENT_PATH_REVERSE, &(current_node->flags)))
+            {
+                log_printf("[get_path_to_junction] Already visited this node. Returning NULL.\n");
+                return return_step;
+            }
+            if(flags_check_for_flag(PATH_FOR_GFA_REVERSE, &(current_node->flags)))
+            {
+                break;
+            }
+            flags_action_set_flag(CURRENT_PATH_REVERSE, &current_node->flags);
+        }
+        
+                
+        if(num_edges == 0)
+        {
+/*
+            char kmer_string[db_graph->kmer_size + 1];
+            BinaryKmer kmer; 
+            binary_kmer_assignment_operator(kmer, *element_get_kmer(current_node));
+            binary_kmer_to_seq(&kmer, db_graph->kmer_size, kmer_string); 
+            kmer_string[db_graph->kmer_size] = '\0';
+            log_printf("[get_path_to_junction] Found dead end at node %s. Returning NULL.\n", kmer_string);
+*/
+            return return_step;
+        }
+        
+        pathStep next_step;
+        next_step.node = current_node;
+        next_step.orientation = current_orientation;
+        Edges edges = db_node_get_edges_for_orientation_all_colours(current_node, current_orientation);
+        for(int n = 0; n < 4; n++) 
+        {
+            if ((edges & 1) == 1) 
+            {
+                next_step.label = n;
+                break;
+            }
+            edges >>= 1;
+        }
+  
+        path_add_node(&next_step, new_path);
+                  
+        current_node = db_graph_get_next_node(next_step.node, next_step.orientation, &current_orientation, next_step.label, 
+                                                &current_reverse, db_graph);  
+        num_edges = db_node_edges_count_all_colours(current_node, current_orientation);
+    }
+    
+    log_printf("[get_path_to_junction] Returning junction node.\n");
+    return_step.node = current_node;
+    return_step.orientation = current_orientation;
+    path_add_node(&return_step, new_path);
+    
+    // mark as visited
+    if(current_orientation == forward)
+    {
+        flags_action_set_flag(CURRENT_PATH_FORWARD, &current_node->flags);
+    }
+    else
+    {
+        flags_action_set_flag(CURRENT_PATH_REVERSE, &current_node->flags);
+    }
+    
+    return return_step;
+}
+    
+pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path** new_path_ptr, dBGraph* db_graph)
+{
+    assert(new_path_ptr != NULL && *new_path_ptr == NULL);
+    
+    typedef struct
+    {
+        Nucleotide base;
+        int coverage;
+    } base_coverage_pair;
 
+    int compare(const void* a, const void* b)
+    {
+        int x = ((base_coverage_pair *)a)->coverage; 
+        int y = ((base_coverage_pair *)b)->coverage;
+        return y - x;
+    }
+    
+    double avg_coverage;
+    int min_coverage;
+    int max_coverage;
+    path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, main_path);
+    
+    //Clear the graph of CURRENT_PATH_FORWARD/REVERSE nodes
+    hash_table_traverse(&db_node_action_unset_flag_current_path, db_graph);
+    // mark the path
+    for(int i = 0; i < main_path->length; i++)
+    {
+        if(main_path->orientations[i] == forward)
+        {
+            flags_action_set_flag(PATH_FOR_GFA_FORWARD, &main_path->nodes[i]->flags);
+        }
+        else
+        {
+            flags_action_set_flag(PATH_FOR_GFA_REVERSE, &main_path->nodes[i]->flags);
+        }
+    }
+    
+    // setup array etc.
+    PathArray* path_array = path_array_new(10);
+    Queue* step_queue = queue_new(200000, sizeof(pathStep*));
+    
+    pathStep* new_step = malloc(sizeof(pathStep));
+    //TODO: consider writing a copy_step function
+    new_step->flags = first_step->flags;
+    new_step->label = first_step->label;
+    new_step->node = first_step->node;
+    new_step->orientation = first_step->orientation;
+    new_step->path = first_step->path;
+    
+    queue_push_step(step_queue, new_step);
+    min_coverage = 1;//(int)(min_coverage * 0.5  > 1 ? min_coverage * 0.5 : 1);
+    
+    pathStep join_step;
+    join_step.node = NULL;
+    join_step.orientation = undefined;
+    join_step.label = undefined;
+    
+    boolean joined_path = false;
+    
+    while(step_queue->number_of_items > 0)
+    {
+        pathStep* next_step = queue_pop_step(step_queue);
+
+        // Remove paths from array that don't join this one. This is a depth first search
+        // so we will get back to the path that ended in the node in next_step eventually.
+        while(path_array->number_of_paths > 0)
+        {
+            Path* last_path = path_array_get_last_path(path_array);
+            assert(last_path->length > 0);
+            if(last_path->nodes[last_path->length - 1] == next_step->node)
+            {
+                break;
+            }
+            else
+            {
+                path_array_remove_last_path(path_array);
+            }
+        }
+        
+        Path* new_path = path_new(100000, db_graph->kmer_size);
+        pathStep junction_step = get_path_to_junction(next_step, new_path, db_graph);
+        if(junction_step.node == NULL)
+        {
+            // found dead end or revisited node. Go back to top of loop.
+            path_destroy(new_path);
+            free(next_step);
+            continue;
+        }
+        
+        dBNode* junction_node = junction_step.node;
+        Orientation junction_orientation = junction_step.orientation;
+                
+        // Check to see if junction_node is back on the main path
+        // if so, break from this loop
+        if( (junction_orientation == forward && flags_check_for_flag(PATH_FOR_GFA_FORWARD, &(junction_node->flags))) ||
+            (junction_orientation == reverse && flags_check_for_flag(PATH_FOR_GFA_REVERSE, &(junction_node->flags))) )
+        {
+
+            //add path to path array
+            path_array_add_path(new_path, path_array);
+            joined_path = true;
+            break;
+        }
+       
+        int num_edges = db_node_edges_count_all_colours(junction_node, junction_orientation);
+        assert(num_edges > 1);
+
+        // get the coverage for each edge
+        base_coverage_pair bcp_array[4];
+        for(Nucleotide base = 0; base < 4; base++) 
+        {
+            bcp_array[base].base = base;
+            bcp_array[base].coverage = 0;
+            if(db_node_edge_exist_any_colour(junction_node, base, junction_orientation))
+            {
+                Orientation next_orientation;
+                Nucleotide reverse_edge;
+                dBNode* next_node = db_graph_get_next_node(junction_node, junction_orientation, &next_orientation, base, &reverse_edge, db_graph);
+                if((next_orientation == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(next_node->flags))) || 
+                   (next_orientation == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(next_node->flags))) )
+                {
+                    continue;
+                }
+                if(next_node == junction_node && next_orientation == junction_orientation)
+                {
+                    continue;
+                }
+                bcp_array[base].coverage = element_get_coverage_all_colours(next_node);                   
+            }      
+        }
+        qsort((void*)bcp_array, 4, sizeof(base_coverage_pair), compare);
+
+        boolean added = false;
+        for(int i = 0; i < 4; i++) 
+        {
+            if(bcp_array[i].coverage >= min_coverage)
+            {
+                Nucleotide base = bcp_array[i].base;
+
+                pathStep* step_for_label = malloc(sizeof(pathStep));
+                step_for_label->node = junction_node;
+                step_for_label->orientation = junction_orientation;
+                step_for_label->label = base;
+                queue_push_step(step_queue, step_for_label);
+                added = true;
+            }
+        }
+
+        if(added)
+        {
+            assert(new_path->length > 0);
+            path_array_add_path(new_path, path_array);
+        }
+        else
+        {
+            path_destroy(new_path);
+        }
+        
+        free(next_step);
+    }
+        
+    
+    if(joined_path)
+    {
+        Path* perfect_path = path_array_merge_to_path(path_array, true);
+        log_printf("[db_graph_search_for_bubble] Found alternative path.\n");
+        int end = -1;
+        for(int i = perfect_path->length - 1; i >= 0; i--)
+        {
+            if((perfect_path->orientations[i] == forward && flags_check_for_flag(PATH_FOR_GFA_FORWARD, &(perfect_path->nodes[i]->flags))) ||
+               (perfect_path->orientations[i] == reverse && flags_check_for_flag(PATH_FOR_GFA_REVERSE, &(perfect_path->nodes[i]->flags))) )
+            {
+                end = i;
+                break;
+            }
+        }
+        
+        if(end > 0)
+        {
+            Path* new_path = path_new(end, perfect_path->kmer_size);
+            
+            log_printf("[db_graph_search_for_bubble] Copying path from 0 to %i.\n", end);
+            path_copy_subpath(new_path, perfect_path, 0, end);
+
+            join_step.node = perfect_path->nodes[end];
+            join_step.orientation = perfect_path->orientations[end];            
+
+            log_printf("[db_graph_search_for_bubble] Perfect path: %s, length %i.\n", perfect_path->seq, perfect_path->length);
+            log_printf("[db_graph_search_for_bubble] New path: %s, length %i.\n", new_path->seq, new_path->length);
+
+             *new_path_ptr = new_path;
+             
+             assert(join_step.node != NULL);
+        }      
+    }
+    
+    // free used memory
+    path_array_destroy(path_array);
+    queue_free(step_queue);
+    
+    
+    // unmark the path
+    for(int i = 0; i < main_path->length; i++)
+    {
+        flags_action_unset_flag(PATH_FOR_GFA_FORWARD, &main_path->nodes[i]->flags);
+        flags_action_unset_flag(PATH_FOR_GFA_REVERSE, &main_path->nodes[i]->flags);
+    }
+    
+    return join_step;
+}
+   
 /**
  * Walk along the graph from first_step until we arrive at a node with the flag PATH_FOR_GFA.
  * At branching points, the branch to the node with highest coverage is taken.
@@ -1297,7 +1607,7 @@ pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep* first_s
 {
     assert(main_path != NULL && new_path != NULL);
     path_reset(new_path);
-    path_mark_path_with_flag(main_path, PATH_FOR_GFA);
+    path_mark_path_with_flag(main_path, PATH_FOR_GFA_FORWARD);
     
     pathStep null_step;
     null_step.node = NULL;
@@ -1312,7 +1622,7 @@ pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep* first_s
     while(!on_path)
     {
         log_printf("Starting check for flag.\n");
-        while(!flags_check_for_flag(PATH_FOR_GFA, &(next_step.node->flags)))
+        while(!flags_check_for_flag(PATH_FOR_GFA_FORWARD, &(next_step.node->flags)))
         {
             boolean added = false;
             assert(current_step.label != Undefined);
@@ -1355,7 +1665,7 @@ pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep* first_s
         {
             if(next_step.node == main_path->nodes[i] && next_step.orientation == main_path->orientations[i])
             {
-                assert((main_path->nodes[i]->flags & PATH_FOR_GFA) !=0);
+                assert((main_path->nodes[i]->flags & PATH_FOR_GFA_FORWARD) !=0);
                 on_path = true;
                 break;
             }
@@ -1376,7 +1686,7 @@ pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep* first_s
         }
     }
     //log_printf("[db_graph_get_highest_coverage_bubble] Returning path with seq %s, length %i.\n", new_path->seq, new_path->length);
-    path_unmark_path_with_flag(main_path, PATH_FOR_GFA);
+    path_unmark_path_with_flag(main_path, PATH_FOR_GFA_FORWARD);
     return next_step;
 }
 

@@ -199,14 +199,7 @@ dBNode* queue_pop_node(Queue* q, int* d)
  *----------------------------------------------------------------------*/
 pathStep* queue_push_step(Queue* q, pathStep* step)
 {
-	pathStep* item = malloc(sizeof(pathStep));
-        item->flags = step->flags;
-        item->label = step->label;
-        item->node = step->node;
-        item->orientation = step->orientation;
-        item->path = step->path;
-
-	return queue_push(q, item);
+	return queue_push(q, step);
 }
 
 pathStep* queue_pop_step(Queue* q)

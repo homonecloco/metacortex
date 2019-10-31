@@ -703,7 +703,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         }
                         path_to_fasta(simple_path, fp_contigs_fasta);
                         //path_to_fastg_gfa(simple_path, fp_contigs_fastg, fp_contigs_gfa, graph);
-                        //path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
+                        path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
                         counter++;
                     } else {
                         log_printf("Didn't write path of size %d\n", simple_path->length);

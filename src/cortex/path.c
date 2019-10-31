@@ -137,10 +137,10 @@ Path *path_new(int max_length, short kmer_size)
 
 void path_destroy(Path * path)
 {
-    if (path == NULL) {
-        fprintf(stderr, "[path_destroy] The path is null");
-        exit(-1);
-    }
+   //if (path == NULL) {
+    //    fprintf(stderr, "[path_destroy] The path is null");
+    //    exit(-1);
+    //}
     free(path->nodes);
     free(path->orientations);
     free(path->labels);
@@ -628,6 +628,63 @@ void path_array_merge(PathArray ** from, PathArray * to){
 
 
 }
+
+Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order)
+{
+    int path_length = 0;
+    for(int i = 0; i < pa->number_of_paths; i++)
+    {
+        path_length += pa->paths[i]->length;
+    }
+    Path* merged_path = path_new(path_length, pa->kmer_size);
+    
+    for(int i = 0; i < pa->number_of_paths; i++)
+    {
+        int index = reverse_array_order ? pa->number_of_paths - 1 -i : i;
+        Path* current_path = pa->paths[index];
+        for(int j = 0; j < current_path->length; j++)
+        {
+            pathStep path_step;
+            path_step.node = current_path->nodes[j];
+            path_step.flags = current_path->step_flags[j];
+            path_step.label = current_path->labels[j];
+            path_step.orientation = current_path->orientations[j];
+            if(merged_path->length >0)
+            {
+                if(path_step.node == merged_path->nodes[merged_path->length - 1] && 
+                   path_step.orientation == merged_path->orientations[merged_path->length - 1])
+                {
+                    continue;
+                }
+            }
+            path_add_node(&path_step, merged_path);
+        }
+    }
+    
+    return merged_path;
+}
+
+Path* path_array_get_last_path(PathArray* pa)
+{
+    return pa->paths[pa->number_of_paths - 1];
+}
+
+void path_array_remove_last_path(PathArray* pa)
+{
+    Path* last_path = pa->paths[pa->number_of_paths - 1];
+    if(last_path != NULL)
+    {
+        path_destroy(last_path);
+        pa->paths[pa->number_of_paths - 1] = NULL;
+    }
+    else
+    {
+        printf("[path_array_remove_last_path] Warning: Attempted to remove last path from path_array"
+                " but path was NULL!\n");
+    }
+    pa->number_of_paths--;
+}
+
 
 void path_to_fasta_debug(Path * path, FILE * fout)
 {
@@ -2775,36 +2832,53 @@ void path_counts_add(Path * p, PathCounts * pc)
     }
 }
 
-void path_copy_subpath(Path* dest_path, const Path* source_path, int start, int end)
+boolean path_copy_subpath(Path* dest_path, const Path* source_path, int start, int end)
 {
     assert(source_path != NULL);
     assert(end - start > 0);
+    assert(start >= 0);
+    assert(end < source_path->length);
     if(dest_path == NULL)
     {
         // some error message
         printf("[path_copy_subpath] Error: Dest path NULL. ");
-        return;
+        return false;
     }
     int length = end - start;
     if(length > dest_path->max_length)
     {
         printf("[path_copy_subpath] Error: Dest path too small to copy subpath into. ");
-        return;
+        return false;
     }
     
-    short kmer_size = source_path->kmer_size;
-    path_reset(dest_path);
-    
-    dest_path->length = length;
-    dest_path->seq[length + kmer_size] = '\0';
+    path_reset(dest_path);  
     for(int i = 0; i < length; i++)
     {
-        dest_path->nodes[i] = source_path->nodes[start + i];
-        dest_path->orientations[i] = source_path->orientations[start + i];
-        dest_path->seq[i] = source_path->seq[start + i];
+        pathStep next_step;
+        next_step.node = source_path->nodes[i];
+        next_step.orientation = source_path->orientations[i];
+        next_step.label = source_path->labels[i];
+        next_step.flags = source_path->step_flags[i];
+        if(!path_add_node(&next_step, dest_path))
+        {
+            char kmer_string[source_path->kmer_size + 1];
+            kmer_string[source_path->kmer_size] = '\0';
+            BinaryKmer kmer; 
+            binary_kmer_assignment_operator(kmer, *element_get_kmer(next_step.node));
+            binary_kmer_to_seq(&kmer, source_path->kmer_size, kmer_string);
+            printf("[path_copy_subpath] Error: Could not copy subpath. Attempting to add node with kmer %s failed.", kmer_string);
+            return false;          
+        }
+        for(int i = 0; i < dest_path->length; i++)
+        {
+            if(dest_path->seq[i] == '\0')
+            {
+                printf("[path_copy_subpath] Warning: path with irregular sequence. Sequence: %s, length: %i.\n", dest_path->seq, dest_path->length);
+            }
+        }
     }
     dest_path->flags = source_path->flags;
-    dest_path->seq[length] = '\0';
+    return true;
 }
 
 void write_fastg_alt(const char* sequence1, const char* sequence2, FILE* file_fastg)
@@ -2835,13 +2909,7 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
     if (path == NULL) {
         fprintf(stderr,	"[path_to_gfa_and_fastg] trying to print a null Path\n");
         exit(-1);
-    }
-    
-
-    char sequence[graph->kmer_size + 1];
-    binary_kmer_to_seq(element_get_kmer(path->nodes[0]), graph->kmer_size, sequence);
-    log_printf("---------------------------\n");
-    log_printf("[path_to_gfa_and_fastg] Writing gfa and fastg for path %s%s", sequence, path->seq);
+    }   
 
     assert(file_gfa != NULL);
     assert(file_fastg != NULL);
@@ -2913,33 +2981,10 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
     file_wrapper.m_file = file_gfa;
     file_wrapper.m_segment_count = 0;
     file_wrapper.m_path_id = path->id;
-        
-    // write the first k nucleotides
-    char kmer_string[path->kmer_size + 1];
-    kmer_string[path->kmer_size] = '\0';
-    BinaryKmer kmer; 
-    binary_kmer_assignment_operator(kmer, *element_get_kmer(fst_node));
-    if(path->orientations[0] == reverse)
-    {
-        BinaryKmer reverse_kmer;
-        binary_kmer_reverse_complement(&kmer, path->kmer_size, &reverse_kmer);
-        binary_kmer_to_seq(&reverse_kmer, path->kmer_size, kmer_string);
-    }
-    else
-    {
-        binary_kmer_to_seq(&kmer, path->kmer_size, kmer_string);
-    }
-
-    fprintf(file_fastg, kmer_string);
-    
-    gfa_segment_array* current_segment = gfa_segment_array_new(1);
-    gfa_segment_array_append(current_segment, (file_wrapper.m_segment_count)++, kmer_string, forward);
-    write_gfa_segment_array(current_segment, &file_wrapper);
     
     //start the recursion!
     fastg_recursion_level = 0;
-    write_paths_between_nodes(path, start_pos, end_pos, graph, current_segment, false, &file_wrapper, file_fastg);
-    gfa_segment_array_destroy(current_segment);
+    write_paths_between_nodes(path, start_pos, end_pos, graph, NULL, false, &file_wrapper, file_fastg);
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------------------*
@@ -2968,7 +3013,7 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
                                                 int start_pos, 
                                                 int end_pos, dBGraph* graph, 
                                                 gfa_segment_array* previous_segments, 
-                                                boolean skip_first, 
+                                                boolean skip_first,
                                                 gfa_file_wrapper* file_gfa, 
                                                 FILE* file_fastg)
 {
@@ -2990,9 +3035,6 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
     int polymorphism_end_pos = -1;
     int polymorphism_start_pos = -1;
     
-    // TODO: Come up with a sensible value for this. What if there is a mega-insertion?
-    // Is it okay to just have the largest possible path size?
-    int max_subpath_length = 10000;//path->length; 
     int main_subpath = -1;
     
     if(skip_first)
@@ -3026,6 +3068,7 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
                     db_graph_get_next_step(&current_step, &next_step, &rev_step, graph);
                     if(next_step.node == path->nodes[current_pos + 1])
                     {
+                        log_printf("Found main path.\n"); 
                         main_subpath = i;
 
                         subpaths[i].m_join_pos = 0;
@@ -3034,10 +3077,11 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
                     }                
                     else
                     {                
-                        subpaths[i].m_path = path_new(max_subpath_length, graph->kmer_size);
+
                         log_printf("Creating path %i\n", i);        
-                        assert(!(current_step.node == next_step.node && current_step.orientation == next_step.orientation));
-                        pathStep join_step = db_graph_get_highest_coverage_bubble(path, &current_step, subpaths[i].m_path, graph);
+                        //assert(!(current_step.node == next_step.node && current_step.orientation == next_step.orientation));
+                        //pathStep join_step = db_graph_get_highest_coverage_bubble(path, &current_step, subpaths[i].m_path, graph);
+                        pathStep join_step = db_graph_search_for_bubble(path, &current_step, &subpaths[i].m_path, graph);
                         if(join_step.node != NULL)
                         {
                             for(int j = current_pos; j < path->length; ++j)
@@ -3047,16 +3091,21 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
                                     polymorphism = true;                             
                                     subpaths[i].m_nucleotide = i;
                                     subpaths[i].m_join_pos = j;
-
+                                    subpaths[i].m_length = subpaths[i].m_path->length;
+                                    log_printf("Path %i has length %i\n", i, subpaths[i].m_length );  
                                     break;
-                                }                       
+                                }                   
                             }
+                            
                         }
                         if(!polymorphism)
                         {
-                            log_printf("Could not find join node.\n"); 
-                            path_destroy(subpaths[i].m_path);
-                            subpaths[i].m_path = NULL;
+                            log_printf("Could not find join node.\n");
+                            if(subpaths[i].m_path)
+                            {
+                                path_destroy(subpaths[i].m_path);
+                                subpaths[i].m_path = NULL;
+                            }
                         }
                     }
                 }
@@ -3072,24 +3121,62 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
         current_pos++;      
     }
    
+    char first_kmer_string[path->kmer_size + 1];
+    if(previous_segments == NULL)
+    {
+        // write the first k nucleotides
+        first_kmer_string[path->kmer_size] = '\0';
+        BinaryKmer kmer; 
+        binary_kmer_assignment_operator(kmer, *element_get_kmer(path->nodes[0]));
+        if(path->orientations[0] == reverse)
+        {
+            BinaryKmer reverse_kmer;
+            binary_kmer_reverse_complement(&kmer, path->kmer_size, &reverse_kmer);
+            binary_kmer_to_seq(&reverse_kmer, path->kmer_size, first_kmer_string);
+        }
+        else
+        {
+            binary_kmer_to_seq(&kmer, path->kmer_size, first_kmer_string);
+        }
+    }
+    
     // construct the segment from start_pos up to current_pos
     int sequence_length = current_pos - start_pos;
     gfa_segment_array* current_segment_array = gfa_segment_array_new(1);
     assert(sequence_length >= 0);
     if(sequence_length == 0)
     {
-        log_printf("Sequence of length 0, using previous segments.\n");
-        gfa_segment_array_merge(current_segment_array, previous_segments); 
+        if(previous_segments == NULL)
+        {
+             gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, first_kmer_string, forward);
+             write_gfa_segment_array(current_segment_array, file_gfa);
+        }
+        else
+        {
+            log_printf("Sequence of length 0, linking to previous segments.\n");
+            gfa_segment_array_merge(current_segment_array, previous_segments);
+        }
     }
     else
     {
 
-        char* sequence = malloc(sizeof(char) * (sequence_length + 1));
+        char sequence[sequence_length + 1];
         strncpy(sequence, path->seq + start_pos, sequence_length);
         sequence[sequence_length] = '\0';
 
-        log_printf("Writing first segment: %s\n", sequence);
-        gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, sequence, forward);
+        if(previous_segments == NULL)
+        {
+            char new_sequence[graph->kmer_size + sequence_length + 1];
+            strcpy(new_sequence, first_kmer_string);
+            strcat(new_sequence, sequence);
+            log_printf("Writing first segment: %s\n", new_sequence);
+            gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, new_sequence, forward);          
+        }
+        else
+        {
+            log_printf("Writing first segment: %s\n", sequence);
+            gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, sequence, forward);
+        }
         write_gfa_segment_array(current_segment_array, file_gfa);
 
         if(previous_segments)
@@ -3104,7 +3191,11 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
         // write to fastg
         if(fastg_recursion_level == 1)
         {
-            fprintf(file_fastg, "%s", sequence);
+            if(previous_segments == NULL)
+            {
+                fprintf(file_fastg, "%s", first_kmer_string);
+            }
+            fprintf(file_fastg, "%s",  sequence);
         }
     }
     
@@ -3141,10 +3232,19 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
                 subpaths[i].m_length = subpaths[i].m_path->length - overlap_between_paths;
                 assert(subpaths[i].m_length >= 0);
             }
-        }
+        } 
 
         // sort the subpaths by length (ascending)
-        sort_subpaths(subpaths);
+        int compare(const void* a, const void* b)
+        {
+            int x = ((subpath *)a)->m_join_pos; 
+            int y = ((subpath *)b)->m_join_pos;
+            return x - y;
+        }
+        qsort((void*)subpaths, 4, sizeof(subpath), compare);
+        
+        //sort_subpaths(subpaths);
+        
         for(int i = 0; i < 4; i++)
         {
             log_printf("Path %i of join pos %i, length %i\n", i, subpaths[i].m_join_pos, subpaths[i].m_length);

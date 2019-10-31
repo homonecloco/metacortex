@@ -118,7 +118,7 @@
 #define PRINT_LABEL_AS_N       (1 <<  4) //x0000 0010
 #define PRINT_LABEL_LOWERCASE  (1 <<  5) //x0000 0020
 
-#define MAX_GFA_RECURSIONS 2
+#define MAX_GFA_RECURSIONS 3
 
 
 typedef enum  {NONE = 0,  FIRST = 1, LAST = 2 }PathEnd ;
@@ -219,6 +219,8 @@ Path * path_new(int max_length, short kmer_size);
 void path_destroy(Path * path);
 
 void path_copy(Path * to, Path * from);
+
+boolean path_copy_subpath(Path* dest_path, const Path* source_path, int start, int end);
 
 void path_increase_id(Path * path);
 
@@ -397,6 +399,12 @@ int path_array_get_number_of_paths(PathArray *);
 boolean path_array_add_path(Path * p, PathArray *pa);
 
 void path_array_merge(PathArray ** from, PathArray * to);
+
+Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order);
+
+Path* path_array_get_last_path(PathArray* pa);
+
+void path_array_remove_last_path(PathArray* pa);
 
 Path * path_array_get(int path, PathArray *pa);
 //Buffer functions
