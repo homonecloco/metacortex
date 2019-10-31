@@ -1,7 +1,5 @@
 all		: metacortex
 
-export CC=/usr/local/Cellar/gcc/9.1.0/bin/gcc-9
-
 ifndef CC
   CC = gcc
 endif
@@ -86,7 +84,7 @@ ifdef 32_BITS
 endif
 
 # Compiler options
-OPT		= $(ARCH) -Wall -O3 -DNUMBER_OF_BITFIELDS_IN_BINARY_KMER=$(BITFIELDS) -pthread -g -fsanitize=address
+OPT		= $(ARCH) -Wall -O3 -DNUMBER_OF_BITFIELDS_IN_BINARY_KMER=$(BITFIELDS) -pthread -g
 #-Wno-duplicate-decl-specifier
 
 ifdef DEBUG
