@@ -1289,7 +1289,7 @@ Nucleotide db_graph_get_best_next_step_nucleotide(dBNode * from, dBNode * previo
 
 pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_graph)
 {
-    log_printf("[get_path_to_junction] Starting get_path_to_junction.\n");
+    //log_printf("[get_path_to_junction] Starting get_path_to_junction.\n");
    
     // don't add first step
     pathStep return_step;
@@ -1308,7 +1308,7 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
         {
             if(flags_check_for_flag(CURRENT_PATH_FORWARD, &(current_node->flags)))
             {
-                log_printf("[get_path_to_junction] Already visited this node. Returning NULL.\n");
+                //log_printf("[get_path_to_junction] Already visited this node. Returning NULL.\n");
                 return return_step;
             }
             if(flags_check_for_flag(PATH_FOR_GFA_FORWARD, &(current_node->flags)))
@@ -1321,7 +1321,7 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
         {
             if(flags_check_for_flag(CURRENT_PATH_REVERSE, &(current_node->flags)))
             {
-                log_printf("[get_path_to_junction] Already visited this node. Returning NULL.\n");
+                //log_printf("[get_path_to_junction] Already visited this node. Returning NULL.\n");
                 return return_step;
             }
             if(flags_check_for_flag(PATH_FOR_GFA_REVERSE, &(current_node->flags)))
@@ -1359,14 +1359,19 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
             edges >>= 1;
         }
   
-        path_add_node(&next_step, new_path);
+        boolean added = path_add_node(&next_step, new_path);    
+        if(!added)
+        {
+            log_printf("[get_path_to_junction] Max path length reached, could not add node.\n");
+            return return_step;
+        }
                   
         current_node = db_graph_get_next_node(next_step.node, next_step.orientation, &current_orientation, next_step.label, 
                                                 &current_reverse, db_graph);  
         num_edges = db_node_edges_count_all_colours(current_node, current_orientation);
     }
     
-    log_printf("[get_path_to_junction] Returning junction node.\n");
+    //log_printf("[get_path_to_junction] Returning junction node.\n");
     return_step.node = current_node;
     return_step.orientation = current_orientation;
     path_add_node(&return_step, new_path);
@@ -1406,6 +1411,9 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     int max_coverage;
     path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, main_path);
     
+    int max_path_size = main_path->length * 10;
+    int max_path_array_total_size = max_path_size * 100;
+    
     //Clear the graph of CURRENT_PATH_FORWARD/REVERSE nodes
     hash_table_traverse(&db_node_action_unset_flag_current_path, db_graph);
     // mark the path
@@ -1425,6 +1433,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     PathArray* path_array = path_array_new(10);
     Queue* step_queue = queue_new(200000, sizeof(pathStep*));
     
+    // This step is freed once it has been popped
     pathStep* new_step = malloc(sizeof(pathStep));
     //TODO: consider writing a copy_step function
     new_step->flags = first_step->flags;
@@ -1442,6 +1451,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     join_step.label = undefined;
     
     boolean joined_path = false;
+    boolean add_first_step = true;
     
     while(step_queue->number_of_items > 0)
     {
@@ -1462,11 +1472,20 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
                 path_array_remove_last_path(path_array);
             }
         }
-        
-        Path* new_path = path_new(100000, db_graph->kmer_size);
-        pathStep junction_step = get_path_to_junction(next_step, new_path, db_graph);
-        if(junction_step.node == NULL)
+       
+        Path* new_path = path_new(max_path_size, db_graph->kmer_size);
+        if(add_first_step)
         {
+            path_add_node(first_step, new_path);
+            add_first_step = false;
+        }
+        pathStep junction_step = get_path_to_junction(next_step, new_path, db_graph);
+        if(junction_step.node == NULL || path_array_get_total_size(path_array) + new_path->length > max_path_array_total_size)
+        {
+            if(path_array_get_total_size(path_array) + new_path->length > max_path_array_total_size)
+            {
+                log_printf("[db_graph_search_for_bubble] Maximum path array total length reached.\n");
+            }
             // found dead end or revisited node. Go back to top of loop.
             path_destroy(new_path);
             free(next_step);
@@ -1485,6 +1504,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
             //add path to path array
             path_array_add_path(new_path, path_array);
             joined_path = true;
+            free(next_step);
             break;
         }
        
@@ -1516,6 +1536,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
         }
         qsort((void*)bcp_array, 4, sizeof(base_coverage_pair), compare);
 
+        //TODO: Check that the total length of the path array isn't too big!
         boolean added = false;
         for(int i = 0; i < 4; i++) 
         {
@@ -1548,7 +1569,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     
     if(joined_path)
     {
-        Path* perfect_path = path_array_merge_to_path(path_array, true);
+        Path* perfect_path = path_array_merge_to_path(path_array, false, db_graph);
         log_printf("[db_graph_search_for_bubble] Found alternative path.\n");
         int end = -1;
         for(int i = perfect_path->length - 1; i >= 0; i--)
@@ -1577,13 +1598,13 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
              *new_path_ptr = new_path;
              
              assert(join_step.node != NULL);
-        }      
+        }
+        path_destroy(perfect_path);
     }
     
     // free used memory
     path_array_destroy(path_array);
     queue_free(step_queue);
-    
     
     // unmark the path
     for(int i = 0; i < main_path->length; i++)

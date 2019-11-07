@@ -400,7 +400,7 @@ boolean path_array_add_path(Path * p, PathArray *pa);
 
 void path_array_merge(PathArray ** from, PathArray * to);
 
-Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order);
+Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order, HashTable* db_graph);
 
 Path* path_array_get_last_path(PathArray* pa);
 
@@ -411,6 +411,8 @@ Path * path_array_get(int path, PathArray *pa);
 void path_array_initialise_buffers(short kmer_size);
 
 void path_array_to_fasta(FILE * f, PathArray * pa);
+
+int path_array_get_total_size(PathArray* pa);
 
 /**
  * This assumes that the program is always using the same kmer size!
@@ -453,7 +455,14 @@ void add_to_P_line(gfa_stats * gfa);
 
 void write_fastg_alt(const char* sequence1, const char* sequence2, FILE* file_fastg);
 
-gfa_segment_array* write_paths_between_nodes(Path* path, int start_pos, int end_pos, HashTable* graph, gfa_segment_array* previous_segments, boolean skip_first, gfa_file_wrapper* file_gfa, FILE* file_fastg);
+typedef struct
+{
+    int m_new_start_pos;
+    boolean m_skip_first;
+    gfa_segment_array* m_segments;
+}   out_struct;
+
+out_struct write_paths_between_nodes(Path* path, int start_pos, int end_pos, HashTable* graph, gfa_segment_array* in_segments, boolean skip_first, gfa_file_wrapper* file_gfa, FILE* file_fastg);
 
 void path_to_gfa2_and_fastg(Path* path, HashTable* graph, FILE* file_gfa, FILE* file_fastg);
 
@@ -467,6 +476,5 @@ typedef struct
     Path* m_path;
 }   subpath;
 
-void sort_subpaths(subpath* a);
 
 #endif /* PATH_H_ */

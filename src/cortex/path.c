@@ -629,8 +629,9 @@ void path_array_merge(PathArray ** from, PathArray * to){
 
 }
 
-Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order)
+Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order, dBGraph* db_graph)
 {
+    log_printf("[path_array_merge_to_path] Merging %i paths.\n", pa->number_of_paths);
     int path_length = 0;
     for(int i = 0; i < pa->number_of_paths; i++)
     {
@@ -642,6 +643,7 @@ Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order)
     {
         int index = reverse_array_order ? pa->number_of_paths - 1 -i : i;
         Path* current_path = pa->paths[index];
+                
         for(int j = 0; j < current_path->length; j++)
         {
             pathStep path_step;
@@ -649,6 +651,39 @@ Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order)
             path_step.flags = current_path->step_flags[j];
             path_step.label = current_path->labels[j];
             path_step.orientation = current_path->orientations[j];
+            
+            if(j == current_path->length - 1 && i < pa->number_of_paths - 1)
+            {
+                assert(path_step.label == Undefined);             
+                int next_index = reverse_array_order ? index - 1 : index + 1;
+                dBNode* next_node = pa->paths[next_index]->nodes[0];
+                
+/*
+                char end_kmer[db_graph->kmer_size + 1];
+                binary_kmer_to_seq(element_get_kmer(path_step.node), db_graph->kmer_size, end_kmer);
+                end_kmer[db_graph->kmer_size] = '\0';
+                        
+                char start_kmer[db_graph->kmer_size + 1];
+                binary_kmer_to_seq(element_get_kmer(next_node), db_graph->kmer_size, start_kmer);
+                start_kmer[db_graph->kmer_size] = '\0';
+                log_printf("[path_array_merge_to_path] End node %s.\n", end_kmer);
+                log_printf("[path_array_merge_to_path] Start node %s.\n", start_kmer);
+*/
+                
+                Orientation next_orientation;
+                Nucleotide rev_edge;
+                for(int nucleotide = 0; nucleotide < 4; nucleotide++)
+                {
+                    if(db_graph_get_next_node(  path_step.node, path_step.orientation, 
+                                                &next_orientation, nucleotide, &rev_edge, db_graph) == next_node)
+                    {
+                        path_step.label = nucleotide;
+                        break;
+                    }
+                }
+                assert(path_step.label != Undefined);
+            }
+            
             if(merged_path->length >0)
             {
                 if(path_step.node == merged_path->nodes[merged_path->length - 1] && 
@@ -685,6 +720,15 @@ void path_array_remove_last_path(PathArray* pa)
     pa->number_of_paths--;
 }
 
+int path_array_get_total_size(PathArray* pa)
+{
+    int total_size = 0;
+    for(int i = 0; i < pa->number_of_paths; i++)
+    {
+        total_size += pa->paths[i]->length;
+    }
+    return total_size;
+}
 
 void path_to_fasta_debug(Path * path, FILE * fout)
 {
@@ -2984,7 +3028,25 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
     
     //start the recursion!
     fastg_recursion_level = 0;
-    write_paths_between_nodes(path, start_pos, end_pos, graph, NULL, false, &file_wrapper, file_fastg);
+    gfa_segment_array* in_segments = NULL;
+    boolean skip_first = false;
+    do
+    {
+        out_struct out = write_paths_between_nodes(path, start_pos, end_pos, graph, in_segments, skip_first, &file_wrapper, file_fastg);
+
+        if(in_segments)
+        {
+            //destroy in segments
+        }
+        
+        start_pos = out.m_new_start_pos;
+        skip_first = out.m_skip_first;
+        in_segments = out.m_segments;
+        
+    }
+    while(skip_first || start_pos < end_pos - 1);
+    // destroy in segments    
+     
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------------------*
@@ -3009,13 +3071,13 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
  * Returns: gfa_segment_array giving all paths that finish at endpos. Usually there is just one, but in the case of a polymorphism there
  *          could be many. 
  *------------------------------------------------------------------------------------------------------------------------------------------*/
-gfa_segment_array* write_paths_between_nodes(   Path* path, 
-                                                int start_pos, 
-                                                int end_pos, dBGraph* graph, 
-                                                gfa_segment_array* previous_segments, 
-                                                boolean skip_first,
-                                                gfa_file_wrapper* file_gfa, 
-                                                FILE* file_fastg)
+out_struct write_paths_between_nodes(  Path* path, 
+                                int start_pos, 
+                                int end_pos, dBGraph* graph, 
+                                gfa_segment_array* in_segments,
+                                boolean skip_first,
+                                gfa_file_wrapper* file_gfa, 
+                                FILE* file_fastg)
 {
     log_printf("\n--Write paths between nodes for sequence %s, between %i and %i, skip-first %i --\n", path->seq, start_pos, end_pos, skip_first);
     fastg_recursion_level++;
@@ -3078,9 +3140,7 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
                     else
                     {                
 
-                        log_printf("Creating path %i\n", i);        
-                        //assert(!(current_step.node == next_step.node && current_step.orientation == next_step.orientation));
-                        //pathStep join_step = db_graph_get_highest_coverage_bubble(path, &current_step, subpaths[i].m_path, graph);
+                        log_printf("Creating path %i\n", i);
                         pathStep join_step = db_graph_search_for_bubble(path, &current_step, &subpaths[i].m_path, graph);
                         if(join_step.node != NULL)
                         {
@@ -3122,7 +3182,7 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
     }
    
     char first_kmer_string[path->kmer_size + 1];
-    if(previous_segments == NULL)
+    if(in_segments == NULL)
     {
         // write the first k nucleotides
         first_kmer_string[path->kmer_size] = '\0';
@@ -3146,7 +3206,7 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
     assert(sequence_length >= 0);
     if(sequence_length == 0)
     {
-        if(previous_segments == NULL)
+        if(in_segments == NULL)
         {
              gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, first_kmer_string, forward);
              write_gfa_segment_array(current_segment_array, file_gfa);
@@ -3154,7 +3214,7 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
         else
         {
             log_printf("Sequence of length 0, linking to previous segments.\n");
-            gfa_segment_array_merge(current_segment_array, previous_segments);
+            gfa_segment_array_merge(current_segment_array, in_segments);
         }
     }
     else
@@ -3164,7 +3224,7 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
         strncpy(sequence, path->seq + start_pos, sequence_length);
         sequence[sequence_length] = '\0';
 
-        if(previous_segments == NULL)
+        if(in_segments == NULL)
         {
             char new_sequence[graph->kmer_size + sequence_length + 1];
             strcpy(new_sequence, first_kmer_string);
@@ -3179,19 +3239,19 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
         }
         write_gfa_segment_array(current_segment_array, file_gfa);
 
-        if(previous_segments)
+        if(in_segments)
         {
             gfa_segment* current_segment = gfa_segment_array_get(current_segment_array, 0);
-            for(int i = 0; i < previous_segments->m_length; i++)
+            for(int i = 0; i < in_segments->m_length; i++)
             {
-                write_gfa_edge(gfa_segment_array_get(previous_segments, i), current_segment, file_gfa);
+                write_gfa_edge(gfa_segment_array_get(in_segments, i), current_segment, file_gfa);
             }
         }
 
         // write to fastg
         if(fastg_recursion_level == 1)
         {
-            if(previous_segments == NULL)
+            if(in_segments == NULL)
             {
                 fprintf(file_fastg, "%s", first_kmer_string);
             }
@@ -3207,7 +3267,11 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
         {
             assert(subpaths[i].m_path == NULL);
         }
-        return current_segment_array;
+        out_struct out;
+        out.m_new_start_pos = current_pos;
+        out.m_segments = current_segment_array;
+        out.m_skip_first = false;
+        return out;
     }
     else
     {
@@ -3239,12 +3303,15 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
         {
             int x = ((subpath *)a)->m_join_pos; 
             int y = ((subpath *)b)->m_join_pos;
+            if(x == y)
+            {
+                x = ((subpath *)a)->m_length;
+                y = ((subpath *)b)->m_length; 
+            }
             return x - y;
         }
         qsort((void*)subpaths, 4, sizeof(subpath), compare);
-        
-        //sort_subpaths(subpaths);
-        
+                
         for(int i = 0; i < 4; i++)
         {
             log_printf("Path %i of join pos %i, length %i\n", i, subpaths[i].m_join_pos, subpaths[i].m_length);
@@ -3259,8 +3326,6 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
         if(fastg_recursion_level == 1)
         {
             int main_seq_length = polymorphism_end_pos - polymorphism_start_pos;
-            log_printf("Writing sequence to fastg\n");           
-            log_printf("Main seq length: %i\n", main_seq_length);
             assert(main_seq_length >= 0);
             
             char main_seq[main_seq_length + 1];
@@ -3269,10 +3334,14 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
             
             int alt_seq_length = subpaths[3].m_length;
             assert(alt_seq_length >= 0);
+            assert(subpaths[3].m_path);
+            //assert(strlen(subpaths[3].m_path->seq) <= alt_seq_length);
             char alt_seq[alt_seq_length + 1];
             strncpy(alt_seq, subpaths[3].m_path->seq, alt_seq_length);
             alt_seq[alt_seq_length] = '\0';    
             
+            log_printf("Writing sequence to fastg\n");           
+            log_printf("Main seq length: %i, alt seq length: %i\n", main_seq_length, alt_seq_length);
             fprintf(file_fastg, "%s", main_seq);
             write_fastg_alt(main_seq, alt_seq, file_fastg);
         }
@@ -3306,7 +3375,8 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
                 if(main_end_pos >= 0)
                 {
                     log_printf("Alt segment: %s, between %i and %i", subpaths[i].m_path->seq, 0, subpaths[i].m_length);
-                    alt_segments = write_paths_between_nodes(subpaths[i].m_path, 0, subpaths[i].m_length, graph, current_segment_array, true, file_gfa, file_fastg);
+                    out_struct alt_out = write_paths_between_nodes(subpaths[i].m_path, 0, subpaths[i].m_length, graph, current_segment_array, true, file_gfa, file_fastg);
+                    alt_segments = alt_out.m_segments;
                 }
 
                 // Do the main path:
@@ -3316,7 +3386,8 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
                     if(length > 0)
                     {
                         log_printf("Main segment: %s, between %i and %i\n", path->seq, main_start_pos, end_pos);
-                        main_segments = write_paths_between_nodes(path, main_start_pos, main_end_pos, graph, out_segments, true, file_gfa, file_fastg);
+                        out_struct main_out = write_paths_between_nodes(path, main_start_pos, main_end_pos, graph, out_segments, true, file_gfa, file_fastg);
+                        main_segments = main_out.m_segments;
                     }
                     else
                     {
@@ -3365,59 +3436,18 @@ gfa_segment_array* write_paths_between_nodes(   Path* path,
             include_last_step = true;
         }
         
-        fastg_recursion_level--;
-        // If new_start_pos is the last node in the path, then there are no more sequences!
-        gfa_segment_array* end;
-        if(include_last_step || new_start_pos < end_pos - 1)
-        {
-            end = write_paths_between_nodes(path, new_start_pos, end_pos, graph, out_segments, include_last_step, file_gfa, file_fastg);
-            // destroy the return segments
-            gfa_segment_array_destroy(out_segments);
-        }
-        else 
-        {
-            //assert(new_start_pos == end_pos - 1);
-            end = out_segments;
-        }
-  
         if(current_segment_array)
         {
             gfa_segment_array_destroy(current_segment_array);
         }
-        return end;
-    }
-}
-
-void sort_subpaths(subpath* a)
-{
-    void swap(subpath* a, int i, int j)
-    {
-        subpath temp = a[i];
-        a[i] = a[j];
-        a[j] = temp;
-    };
-    if(a[1].m_join_pos < a[0].m_join_pos || (a[1].m_join_pos == a[0].m_join_pos && a[1].m_length < a[0].m_length))
-    {
-        swap(a, 0, 1);
-    }
-    if(a[3].m_join_pos < a[2].m_join_pos || (a[3].m_join_pos == a[2].m_join_pos && a[3].m_length < a[2].m_length))
-    {
-        swap(a, 2, 3);
-    }
-    if(a[2].m_join_pos < a[1].m_join_pos || (a[2].m_join_pos == a[1].m_join_pos && a[2].m_length < a[1].m_length))
-    {
-        swap(a, 1, 2);
-    }
-    if(a[1].m_join_pos < a[0].m_join_pos || (a[1].m_join_pos == a[0].m_join_pos && a[1].m_length < a[0].m_length))
-    {
-        swap(a, 0, 1);
-    }
-    if(a[3].m_join_pos < a[2].m_join_pos || (a[3].m_join_pos == a[2].m_join_pos && a[3].m_length < a[2].m_length))
-    {
-        swap(a, 2, 3);
-    }
-    if(a[2].m_join_pos < a[1].m_join_pos || (a[2].m_join_pos == a[1].m_join_pos && a[2].m_length < a[1].m_length))
-    {
-        swap(a, 1, 2);
+        
+        out_struct out;
+        out.m_new_start_pos = new_start_pos;
+        out.m_segments = out_segments;
+        out.m_skip_first = include_last_step;
+        
+        fastg_recursion_level--;
+        
+        return out;
     }
 }
