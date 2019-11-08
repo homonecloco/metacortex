@@ -3036,7 +3036,8 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
 
         if(in_segments)
         {
-            //destroy in segments
+            gfa_segment_array_destroy(in_segments);
+            in_segments = NULL;
         }
         
         start_pos = out.m_new_start_pos;
@@ -3045,8 +3046,12 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
         
     }
     while(skip_first || start_pos < end_pos - 1);
-    // destroy in segments    
-     
+    
+    // destroy in segments  
+    if(in_segments)
+    {
+        gfa_segment_array_destroy(in_segments);
+    }    
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------------------*
