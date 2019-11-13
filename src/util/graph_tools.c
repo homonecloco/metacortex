@@ -239,7 +239,7 @@ int graph_tools_walk_around(GraphToolsOptions* options, GraphToolsState* state, 
     }
     
     // Start a queue of nodes to walk
-    nodes_to_walk = queue_new(options->max_nodes_to_output);
+    nodes_to_walk = node_queue_new(options->max_nodes_to_output);
     if (!nodes_to_walk) {
         printf("Couldn't get memory for node queue.\n");
         exit(1);
