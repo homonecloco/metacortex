@@ -953,6 +953,11 @@ void db_node_action_unset_flag_current_path(dBNode * node)
     db_node_action_unset_flag(node, CURRENT_PATH_FORWARD | CURRENT_PATH_REVERSE);
 }
 
+void db_node_action_unset_flat_visited(dBNode* node)
+{
+    db_node_action_unset_flag(node, VISITED_FORWARD | VISITED_REVERSE);
+}
+
 void db_node_action_unset_flag(dBNode * node, Flags f)
 {
     //if(DEBUG) printf("UNSET: %x & ~%x = %x\n", node->flags, f, (node->flags & ~f));

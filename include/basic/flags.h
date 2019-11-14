@@ -74,7 +74,7 @@
 #ifndef BUILD_RAINBOWS
 //TODO make a more facny set of ifs to decide to use or not the short version of Flags
 #ifndef SHORT_FLAGS
-//#define SHORT_FLAGS
+#define SHORT_FLAGS
 #endif
 #endif
 /**
@@ -115,8 +115,6 @@ typedef uint32_t Flags;
 #define  PRUNED                     (1 << 24) //x0100 0000
 #define  ASSIGNED                   (1 << 25) //x0200 0000
 #define  Y_START                    (1 << 26) //x0400 0000
-#define  PATH_FOR_GFA_FORWARD       (1 << 27) //x0800 0000
-#define  PATH_FOR_GFA_REVERSE       (1 << 28) //x1000 0000
 
 #else
 typedef uint16_t Flags;

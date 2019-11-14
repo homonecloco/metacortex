@@ -220,7 +220,9 @@ void db_node_action_unset_current_path(dBNode * node, Orientation o);
 
 boolean db_node_action_is_in_current_path(dBNode * node, Orientation o);
 
-void db_node_action_unset_flag_current_path(dBNode * no);
+void db_node_action_unset_flag_current_path(dBNode * node);
+
+void db_node_action_unset_flat_visited(dBNode* node);
 
 boolean db_node_check_flag_visited(dBNode * node) ;
 

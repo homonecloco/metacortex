@@ -1306,29 +1306,29 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
     {
         if(current_orientation == forward)
         {
-            if(flags_check_for_flag(CURRENT_PATH_FORWARD, &(current_node->flags)))
+            if(flags_check_for_flag(VISITED_FORWARD, &(current_node->flags)))
             {
                 //log_printf("[get_path_to_junction] Already visited this node. Returning NULL.\n");
                 return return_step;
             }
-            if(flags_check_for_flag(PATH_FOR_GFA_FORWARD, &(current_node->flags)))
+            if(flags_check_for_flag(CURRENT_PATH_FORWARD, &(current_node->flags)))
             {
                 break;
             }
-            flags_action_set_flag(CURRENT_PATH_FORWARD, &current_node->flags);
+            flags_action_set_flag(VISITED_FORWARD, &current_node->flags);
         }
         else
         {
-            if(flags_check_for_flag(CURRENT_PATH_REVERSE, &(current_node->flags)))
+            if(flags_check_for_flag(VISITED_REVERSE, &(current_node->flags)))
             {
                 //log_printf("[get_path_to_junction] Already visited this node. Returning NULL.\n");
                 return return_step;
             }
-            if(flags_check_for_flag(PATH_FOR_GFA_REVERSE, &(current_node->flags)))
+            if(flags_check_for_flag(CURRENT_PATH_REVERSE, &(current_node->flags)))
             {
                 break;
             }
-            flags_action_set_flag(CURRENT_PATH_REVERSE, &current_node->flags);
+            flags_action_set_flag(VISITED_REVERSE, &current_node->flags);
         }
         
                 
@@ -1379,11 +1379,11 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
     // mark as visited
     if(current_orientation == forward)
     {
-        flags_action_set_flag(CURRENT_PATH_FORWARD, &current_node->flags);
+        flags_action_set_flag(VISITED_FORWARD, &current_node->flags);
     }
     else
     {
-        flags_action_set_flag(CURRENT_PATH_REVERSE, &current_node->flags);
+        flags_action_set_flag(VISITED_REVERSE, &current_node->flags);
     }
     
     return return_step;
@@ -1414,18 +1414,18 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     int max_path_size = main_path->length * 10;
     int max_path_array_total_size = max_path_size * 100;
     
-    //Clear the graph of CURRENT_PATH_FORWARD/REVERSE nodes
-    hash_table_traverse(&db_node_action_unset_flag_current_path, db_graph);
+    //Clear the graph of VISITED_FORWARD/REVERSE flags
+    hash_table_traverse(&db_node_action_unset_flat_visited, db_graph);
     // mark the path
     for(int i = 0; i < main_path->length; i++)
     {
         if(main_path->orientations[i] == forward)
         {
-            flags_action_set_flag(PATH_FOR_GFA_FORWARD, &main_path->nodes[i]->flags);
+            flags_action_set_flag(CURRENT_PATH_FORWARD, &main_path->nodes[i]->flags);
         }
         else
         {
-            flags_action_set_flag(PATH_FOR_GFA_REVERSE, &main_path->nodes[i]->flags);
+            flags_action_set_flag(CURRENT_PATH_REVERSE, &main_path->nodes[i]->flags);
         }
     }
     
@@ -1497,8 +1497,8 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
                 
         // Check to see if junction_node is back on the main path
         // if so, break from this loop
-        if( (junction_orientation == forward && flags_check_for_flag(PATH_FOR_GFA_FORWARD, &(junction_node->flags))) ||
-            (junction_orientation == reverse && flags_check_for_flag(PATH_FOR_GFA_REVERSE, &(junction_node->flags))) )
+        if( (junction_orientation == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(junction_node->flags))) ||
+            (junction_orientation == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(junction_node->flags))) )
         {
 
             //add path to path array
@@ -1522,8 +1522,8 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
                 Orientation next_orientation;
                 Nucleotide reverse_edge;
                 dBNode* next_node = db_graph_get_next_node(junction_node, junction_orientation, &next_orientation, base, &reverse_edge, db_graph);
-                if((next_orientation == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(next_node->flags))) || 
-                   (next_orientation == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(next_node->flags))) )
+                if((next_orientation == forward && flags_check_for_flag(VISITED_FORWARD, &(next_node->flags))) || 
+                   (next_orientation == reverse && flags_check_for_flag(VISITED_REVERSE, &(next_node->flags))) )
                 {
                     continue;
                 }
@@ -1574,8 +1574,8 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
         int end = -1;
         for(int i = perfect_path->length - 1; i >= 0; i--)
         {
-            if((perfect_path->orientations[i] == forward && flags_check_for_flag(PATH_FOR_GFA_FORWARD, &(perfect_path->nodes[i]->flags))) ||
-               (perfect_path->orientations[i] == reverse && flags_check_for_flag(PATH_FOR_GFA_REVERSE, &(perfect_path->nodes[i]->flags))) )
+            if((perfect_path->orientations[i] == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(perfect_path->nodes[i]->flags))) ||
+               (perfect_path->orientations[i] == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(perfect_path->nodes[i]->flags))) )
             {
                 end = i;
                 break;
@@ -1609,8 +1609,8 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     // unmark the path
     for(int i = 0; i < main_path->length; i++)
     {
-        flags_action_unset_flag(PATH_FOR_GFA_FORWARD, &main_path->nodes[i]->flags);
-        flags_action_unset_flag(PATH_FOR_GFA_REVERSE, &main_path->nodes[i]->flags);
+        flags_action_unset_flag(CURRENT_PATH_FORWARD, &main_path->nodes[i]->flags);
+        flags_action_unset_flag(CURRENT_PATH_REVERSE, &main_path->nodes[i]->flags);
     }
     
     return join_step;
@@ -1628,7 +1628,7 @@ pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep* first_s
 {
     assert(main_path != NULL && new_path != NULL);
     path_reset(new_path);
-    path_mark_path_with_flag(main_path, PATH_FOR_GFA_FORWARD);
+    path_mark_path_with_flag(main_path, CURRENT_PATH_FORWARD);
     
     pathStep null_step;
     null_step.node = NULL;
@@ -1643,7 +1643,7 @@ pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep* first_s
     while(!on_path)
     {
         log_printf("Starting check for flag.\n");
-        while(!flags_check_for_flag(PATH_FOR_GFA_FORWARD, &(next_step.node->flags)))
+        while(!flags_check_for_flag(CURRENT_PATH_FORWARD, &(next_step.node->flags)))
         {
             boolean added = false;
             assert(current_step.label != Undefined);
@@ -1686,7 +1686,7 @@ pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep* first_s
         {
             if(next_step.node == main_path->nodes[i] && next_step.orientation == main_path->orientations[i])
             {
-                assert((main_path->nodes[i]->flags & PATH_FOR_GFA_FORWARD) !=0);
+                assert((main_path->nodes[i]->flags & CURRENT_PATH_FORWARD) !=0);
                 on_path = true;
                 break;
             }
@@ -1707,7 +1707,7 @@ pathStep db_graph_get_highest_coverage_bubble(Path* main_path, pathStep* first_s
         }
     }
     //log_printf("[db_graph_get_highest_coverage_bubble] Returning path with seq %s, length %i.\n", new_path->seq, new_path->length);
-    path_unmark_path_with_flag(main_path, PATH_FOR_GFA_FORWARD);
+    path_unmark_path_with_flag(main_path, CURRENT_PATH_FORWARD);
     return next_step;
 }
 

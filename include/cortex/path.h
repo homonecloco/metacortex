@@ -118,7 +118,7 @@
 #define PRINT_LABEL_AS_N       (1 <<  4) //x0000 0010
 #define PRINT_LABEL_LOWERCASE  (1 <<  5) //x0000 0020
 
-#define MAX_GFA_RECURSIONS 3
+#define MAX_GFA_RECURSIONS 4
 
 
 typedef enum  {NONE = 0,  FIRST = 1, LAST = 2 }PathEnd ;

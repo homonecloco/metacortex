@@ -2957,6 +2957,9 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
 
     assert(file_gfa != NULL);
     assert(file_fastg != NULL);
+    
+    // Clear graph of CURRENT_PATH_FORWARD/REVERSE flags
+    hash_table_traverse(&db_node_action_unset_flag_current_path, graph);
   
     // write fastg header  
     short kmer_size = path->kmer_size;
