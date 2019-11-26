@@ -1443,7 +1443,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     new_step->path = first_step->path;
     
     queue_push_step(step_queue, new_step);
-    min_coverage = 1;//(int)(min_coverage * 0.5  > 1 ? min_coverage * 0.5 : 1);
+    min_coverage = (int)(min_coverage * 0.5  > 1 ? min_coverage * 0.5 : 1);
     
     pathStep join_step;
     join_step.node = NULL;
