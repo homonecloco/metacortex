@@ -1569,13 +1569,13 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     
     if(joined_path)
     {
-        Path* perfect_path = path_array_merge_to_path(path_array, false, db_graph);
+        Path* alt_path = path_array_merge_to_path(path_array, false, db_graph);
         log_printf("[db_graph_search_for_bubble] Found alternative path.\n");
         int end = -1;
-        for(int i = perfect_path->length - 1; i >= 0; i--)
+        for(int i = alt_path->length - 1; i >= 0; i--)
         {
-            if((perfect_path->orientations[i] == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(perfect_path->nodes[i]->flags))) ||
-               (perfect_path->orientations[i] == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(perfect_path->nodes[i]->flags))) )
+            if((alt_path->orientations[i] == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(alt_path->nodes[i]->flags))) ||
+               (alt_path->orientations[i] == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(alt_path->nodes[i]->flags))) )
             {
                 end = i;
                 break;
@@ -1584,22 +1584,21 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
         
         if(end > 0)
         {
-            Path* new_path = path_new(end, perfect_path->kmer_size);
+            Path* new_path = path_new(end, alt_path->kmer_size);
             
             log_printf("[db_graph_search_for_bubble] Copying path from 0 to %i.\n", end);
-            path_copy_subpath(new_path, perfect_path, 0, end);
+            path_copy_subpath(new_path, alt_path, 0, end);
 
-            join_step.node = perfect_path->nodes[end];
-            join_step.orientation = perfect_path->orientations[end];            
+            join_step.node = alt_path->nodes[end];
+            join_step.orientation = alt_path->orientations[end];            
 
-            log_printf("[db_graph_search_for_bubble] Perfect path: %s, length %i.\n", perfect_path->seq, perfect_path->length);
             log_printf("[db_graph_search_for_bubble] New path: %s, length %i.\n", new_path->seq, new_path->length);
 
              *new_path_ptr = new_path;
              
              assert(join_step.node != NULL);
         }
-        path_destroy(perfect_path);
+        path_destroy(alt_path);
     }
     
     // free used memory
