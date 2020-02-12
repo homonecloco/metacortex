@@ -1415,7 +1415,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     int max_path_array_total_size = max_path_size * 100;
     
     //Clear the graph of VISITED_FORWARD/REVERSE flags
-    hash_table_traverse(&db_node_action_unset_flat_visited, db_graph);
+    hash_table_traverse_no_progress_bar(&db_node_action_unset_flag_visited_forward_reverse, db_graph);
     // mark the path
     for(int i = 0; i < main_path->length; i++)
     {

@@ -953,7 +953,12 @@ void db_node_action_unset_flag_current_path(dBNode * node)
     db_node_action_unset_flag(node, CURRENT_PATH_FORWARD | CURRENT_PATH_REVERSE);
 }
 
-void db_node_action_unset_flat_visited(dBNode* node)
+void db_node_action_unset_flag_visited(dBNode * node)
+{
+    db_node_action_unset_flag(node, VISITED);
+}
+
+void db_node_action_unset_flag_visited_forward_reverse(dBNode* node)
 {
     db_node_action_unset_flag(node, VISITED_FORWARD | VISITED_REVERSE);
 }

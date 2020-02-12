@@ -2959,7 +2959,7 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
     assert(file_fastg != NULL);
     
     // Clear graph of CURRENT_PATH_FORWARD/REVERSE flags
-    hash_table_traverse(&db_node_action_unset_flag_current_path, graph);
+    hash_table_traverse_no_progress_bar(&db_node_action_unset_flag_current_path, graph);
   
     // write fastg header  
     short kmer_size = path->kmer_size;
@@ -3071,7 +3071,7 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
  *             - int start_pos                                  - The position in the path to start from.
  *             - int end_pos                                    - The position in the path to end at.
  *             - dBGraph* graph (const)                         - The graph that contains the path.
- *             - gfa_segment_array* previous segments (const)   - Pointer to array of path segments from previous call that join at
+ *             - gfa_segment_array* in_segments                 - Pointer to array of path segments from previous call that join at
  *                                                                start_pos.
  *             - boolean skip_first                             - Whether or not to skip the first node in the sequence. Used for indels.
  *             - gfa_file_wrapper* file_gfa                     - Pointer to wrapper for FILE object representing the gfa output file.

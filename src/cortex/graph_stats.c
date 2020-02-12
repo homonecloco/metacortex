@@ -292,6 +292,7 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
                             }
 
                             db_node_action_set_flag_visited(new_path->nodes[i]);
+                            queue_push(graph_queue, new_path->nodes[i]);
                             nodes_in_graph->total_size++;
                         }
                     } // path->length loop
@@ -659,6 +660,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
             log_printf("\n");
 
             // now with a subgraph, walk the graph counting degrees by graph
+            // - this sets VISITED flag as true for many of the nodes in the graph.
             grow_graph_from_node_stats(node, &seed_node, graph, graph_queue, nodes_in_graph, delta_coverage);
 
             if (nodes_in_graph->total_size ==1) {
@@ -702,18 +704,18 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                             fprintf(fp_contigs_gfa, "H\n");
                         }
                         path_to_fasta(simple_path, fp_contigs_fasta);
-                        //path_to_fastg_gfa(simple_path, fp_contigs_fastg, fp_contigs_gfa, graph);
                         path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
                         counter++;
                     } else {
                         log_printf("Didn't write path of size %d\n", simple_path->length);
                     }
 
-
+            
                     /*	HERE - INSTEAD OF 'VISITING' AN X-NODE, REMOVE EDGES FROM BEFORE
                      AND AFTER IT ON CURRENT PATH */
+                    
+                    //unset VISITED flags from grow_graph_from_node_stats
                     dBNode* queue_node;
-
                     while (graph_queue->number_of_items > 0) {
                         queue_node = (dBNode*)queue_pop(graph_queue);
                         db_node_action_unset_flag(queue_node, VISITED);

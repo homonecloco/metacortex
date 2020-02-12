@@ -202,6 +202,7 @@ void db_node_action_set_flag_pruned(dBNode * node);
 
 void db_node_action_set_flag_visited(dBNode * node);
 
+
 long long int get_visited_count(void);
 
 void clear_visited_count(void);
@@ -222,7 +223,9 @@ boolean db_node_action_is_in_current_path(dBNode * node, Orientation o);
 
 void db_node_action_unset_flag_current_path(dBNode * node);
 
-void db_node_action_unset_flat_visited(dBNode* node);
+void db_node_action_unset_flag_visited(dBNode* node);
+
+void db_node_action_unset_flag_visited_forward_reverse(dBNode* node);
 
 boolean db_node_check_flag_visited(dBNode * node) ;
 

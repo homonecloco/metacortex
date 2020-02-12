@@ -248,6 +248,18 @@ boolean hash_table_apply_or_insert(Key key, void (*f)(Element *), HashTable * ha
 
 }
 
+void hash_table_traverse_no_progress_bar(void (*f)(Element *),HashTable * hash_table)
+{
+    long long i;
+    for(i=0;i<hash_table->number_buckets * hash_table->bucket_size;i++)
+    {
+        if (!element_check_for_flag_ALL_OFF(&hash_table->table[i]))
+        {
+                f(&hash_table->table[i]);
+        }
+    }
+
+}
 
 void hash_table_traverse(void (*f)(Element *),HashTable * hash_table){
 	long long i;
