@@ -46,4 +46,5 @@ typedef struct {
 
 //int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue);
 
-void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, boolean multiple_subgraph_contigs);
+void metacortex_find_subgraphs( dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, 
+                                boolean multiple_subgraph_contigs, boolean gfa_fastg_output);

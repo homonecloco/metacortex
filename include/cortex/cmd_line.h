@@ -111,6 +111,7 @@ typedef struct
     boolean output_log;
     boolean output_kmer_coverage_know;
     boolean multiple_subgraph_contigs;
+    boolean gfa_and_fastg;
     
     //-----------
     //parameters

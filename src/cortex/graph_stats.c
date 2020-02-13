@@ -351,7 +351,7 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
 // ----------------------------------------------------------------------
 void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                          int min_subgraph_kmers, int min_contig_size, int max_node_edges, float delta_coverage,
-                         int linked_list_max_size, int walk_paths)
+                         int linked_list_max_size, int walk_paths, boolean gfa_fastg_output)
 {
     FILE* fp_analysis;
     FILE* fp_report;
@@ -420,22 +420,25 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
 
 
     /* Open fastg contigs file */
-    sprintf(fastg_filename, "%s.fastg", consensus_contigs_filename);
-    fp_contigs_fastg = fopen(fastg_filename, "w");
-    if (!fp_contigs_fastg) {
-        log_and_screen_printf("ERROR: Can't open contig (fastg) file.\n%s\n", fastg_filename);
-        exit(-1);
-    }
-    // write the header
-    fprintf(fp_contigs_fastg, "#FASTG:begin;");
-    fprintf(fp_contigs_fastg, "\n#FASTG:version=1.0:assembly_name=\"%s\";", consensus_contigs_filename);
+    if(gfa_fastg_output)
+    {
+        sprintf(fastg_filename, "%s.fastg", consensus_contigs_filename);
+        fp_contigs_fastg = fopen(fastg_filename, "w");
+        if (!fp_contigs_fastg) {
+            log_and_screen_printf("ERROR: Can't open contig (fastg) file.\n%s\n", fastg_filename);
+            exit(-1);
+        }
+        // write the header
+        fprintf(fp_contigs_fastg, "#FASTG:begin;");
+        fprintf(fp_contigs_fastg, "\n#FASTG:version=1.0:assembly_name=\"%s\";", consensus_contigs_filename);
 
-    /* Open gfa contigs file */
-    sprintf(gfa_filename, "%s.gfa", consensus_contigs_filename);
-    fp_contigs_gfa = fopen(gfa_filename, "w");
-    if (!fp_contigs_gfa) {
-        log_and_screen_printf("ERROR: Can't open contig (gfa) file.\n%s\n", gfa_filename);
-        exit(-1);
+        /* Open gfa contigs file */
+        sprintf(gfa_filename, "%s.gfa", consensus_contigs_filename);
+        fp_contigs_gfa = fopen(gfa_filename, "w");
+        if (!fp_contigs_gfa) {
+            log_and_screen_printf("ERROR: Can't open contig (gfa) file.\n%s\n", gfa_filename);
+            exit(-1);
+        }
     }
 
     /* Open the sugraph degree file */
@@ -700,11 +703,16 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         path_get_statistics(&average_coverage, &min_coverage, &max_coverage, simple_path);
                         // NOTE: decision - minimum cov or average cov dictates confidence threshold met?
                         // Output for alternative formats
-                        if(fp_contigs_gfa!=NULL){
-                            fprintf(fp_contigs_gfa, "H\n");
-                        }
                         path_to_fasta(simple_path, fp_contigs_fasta);
-                        path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
+                        
+                        if(gfa_fastg_output)
+                        {
+                            if(fp_contigs_gfa!=NULL)
+                            {
+                                fprintf(fp_contigs_gfa, "H\n");
+                            }
+                            path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
+                        }
                         counter++;
                     } else {
                         log_printf("Didn't write path of size %d\n", simple_path->length);
@@ -787,7 +795,12 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
     log_and_screen_printf("DONE\n");
     
     // write the fastg footer
-    fprintf(fp_contigs_fastg, "\n#FASTG:end;");
+    if(gfa_fastg_output)
+    {
+        fprintf(fp_contigs_fastg, "\n#FASTG:end;");
+        fclose(fp_contigs_fastg);
+        fclose(fp_contigs_gfa);
+    }
     
     fclose(fp_analysis);
     fclose(fp_degrees);

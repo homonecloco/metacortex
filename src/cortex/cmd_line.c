@@ -140,6 +140,7 @@ int default_opts(CmdLine * c)
     c->output_log = false;
     c->min_contig_length = 0;
     c->path_coverage_minimum = 1;
+    c->gfa_and_fastg = false;
 
     //-----------
     //parameters
@@ -228,9 +229,9 @@ CmdLine parse_cmdline(int argc, char *argv[], int unit_size)
         {"linked_list_max_size", required_argument, NULL, 'y'},  // using still available letters
         {"remove_low_coverage_kmers", required_argument, NULL, 'z'},
         {"algorithm",required_argument,NULL,'A'},
-        {"graphviz", required_argument, NULL, 'G'},
-     		{"input_reference", required_argument, NULL, 'H'},
-  		  {"output_kmer_coverage", required_argument, NULL, 'J'},
+        {"gfa", no_argument, NULL, 'G'},
+     	{"input_reference", required_argument, NULL, 'H'},
+  	{"output_kmer_coverage", required_argument, NULL, 'J'},
         {"remove_spurious_links",required_argument,NULL,'L'},
         {"multiple_subgraph_contigs",no_argument,NULL,'M'},
         {"hash_output_file", required_argument, NULL, 'O'},
@@ -238,11 +239,12 @@ CmdLine parse_cmdline(int argc, char *argv[], int unit_size)
         {"delta_coverage", required_argument, NULL, 'R'},  // using still available letters
         {"graph_stats", no_argument, NULL, 'S'},
         {"threads", required_argument, NULL, 'T'},
+        {"graphviz", required_argument, NULL, 'V'},
         {0, 0, 0, 0}
     };
 
     while ((opt = getopt_long(argc, argv,
-                              "ab:c:d:ef:g:hi:jk:l:m:n:o:p:q:r:s:t:uvw:x:y:z:A:B:C:D:E:FG:H:I:J:K:L:MN:O:P:R:STZ:",
+                              "ab:c:d:ef:g:hi:jk:l:m:n:o:p:q:r:s:t:uvw:x:y:z:A:B:C:D:E:FGH:I:J:K:L:MN:O:P:R:STV:Z:",
                               long_options, &longopt_index)) > 0)
     {
         //Parse the default options
@@ -519,33 +521,7 @@ CmdLine parse_cmdline(int argc, char *argv[], int unit_size)
                 break;
 
             case 'G':
-                if (optarg == NULL) {
-                    errx(1, "[-G | --graphviz] option requires a filename [file of filenames]");
-                    exit(-1);
-                }
-                if (strlen(optarg) < LENGTH_FILENAME) {
-                    strcpy(cmd_line.output_graphviz_filename, optarg);
-                } else {
-                    errx(1, "[-G | --graphviz] filename too long [%s]", optarg);
-                }
-                cmd_line.graphviz = true;
-                printf("Graphviz file: %s\n", optarg);
-                break;
-			case 'H':
-               	if (optarg == NULL) {
-                   errx(1, "[-H | --input_reference ] option requires a filename [fasta file reference]");
-                   exit(-1);
-               }
-               if (strlen(optarg) < LENGTH_FILENAME) {
-                   strcpy(cmd_line.input_reference, optarg);
-               } else {
-                   errx(1, "[-H | --input_reference] filename too long [%s]", optarg);
-               }
-               if (access(optarg, R_OK) == -1) {
-					errx(1,"[-H | --input_reference] filename [%s] cannot be accessed", optarg);
-               }
-               printf("Reference file: %s\n", optarg);
-			   cmd_line.input_reference_known = true;
+               cmd_line.gfa_and_fastg = true;
                break;
             case 'J':
 				cmd_line.output_kmer_coverage_know = true;
@@ -645,7 +621,35 @@ CmdLine parse_cmdline(int argc, char *argv[], int unit_size)
                     errx(1, "[-T | --threads INT] has to be a power of two. ");
                 }
                 break;
-
+            case 'V':
+                if (optarg == NULL) {
+                    errx(1, "[-G | --graphviz] option requires a filename [file of filenames]");
+                    exit(-1);
+                }
+                if (strlen(optarg) < LENGTH_FILENAME) {
+                    strcpy(cmd_line.output_graphviz_filename, optarg);
+                } else {
+                    errx(1, "[-G | --graphviz] filename too long [%s]", optarg);
+                }
+                cmd_line.graphviz = true;
+                printf("Graphviz file: %s\n", optarg);
+                break;
+			case 'H':
+               	if (optarg == NULL) {
+                   errx(1, "[-H | --input_reference ] option requires a filename [fasta file reference]");
+                   exit(-1);
+               }
+               if (strlen(optarg) < LENGTH_FILENAME) {
+                   strcpy(cmd_line.input_reference, optarg);
+               } else {
+                   errx(1, "[-H | --input_reference] filename too long [%s]", optarg);
+               }
+               if (access(optarg, R_OK) == -1) {
+					errx(1,"[-H | --input_reference] filename [%s] cannot be accessed", optarg);
+               }
+               printf("Reference file: %s\n", optarg);
+			   cmd_line.input_reference_known = true;
+               break;
             case 'Z'://max read length --> use by the parser to read fasta/fastq files.
                 if (optarg==NULL) {
                     errx(1,"[-Z | --max_read_len] option requires int argument [maximum read length in input]");

@@ -180,16 +180,21 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
     return current_graph_size;
 }
 
-void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, boolean multiple_subgraph_contigs)
+void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, 
+                                boolean multiple_subgraph_contigs, boolean gfa_fastg_output)
 {
     FILE* fp_analysis;
     FILE* fp_contigs;
+    FILE* fp_contigs_fastg;
+    FILE* fp_contigs_gfa;
     Queue* graph_queue;
     Path *path_fwd = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
     Path *path_rev = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
     Path *final_path = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
     char seq[256];
     char analysis_filename[256];
+    char gfa_filename[256];
+    char fastg_filename[256];
     long int total_nodes = 0;
     int n_seeds = 0;
     int counter= 0;
@@ -222,6 +227,29 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
     if (!fp_contigs) {
         log_and_screen_printf("ERROR: Can't open contig file.\n");
         exit(-1);
+    }
+    
+    remove_file_extension(consensus_contigs_filename);
+    /* Open fastg contigs file */
+    if(gfa_fastg_output)
+    {
+        sprintf(fastg_filename, "%s.fastg", consensus_contigs_filename);
+        fp_contigs_fastg = fopen(fastg_filename, "w");
+        if (!fp_contigs_fastg) {
+            log_and_screen_printf("ERROR: Can't open contig (fastg) file.\n%s\n", fastg_filename);
+            exit(-1);
+        }
+        // write the header
+        fprintf(fp_contigs_fastg, "#FASTG:begin;");
+        fprintf(fp_contigs_fastg, "\n#FASTG:version=1.0:assembly_name=\"%s\";", consensus_contigs_filename);
+
+        /* Open gfa contigs file */
+        sprintf(gfa_filename, "%s.gfa", consensus_contigs_filename);
+        fp_contigs_gfa = fopen(gfa_filename, "w");
+        if (!fp_contigs_gfa) {
+            log_and_screen_printf("ERROR: Can't open contig (gfa) file.\n%s\n", gfa_filename);
+            exit(-1);
+        }
     }
 
     /* For each node, if it's not pruned or visited, try and grow a graph */
@@ -264,7 +292,12 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
                     if (final_path->length >= (min_contig_length - graph->kmer_size)) {
                         log_printf("Write path of size %d\n", final_path->length);
                         log_printf("graph size\t%i\n",nodes_in_graph);
-                        path_to_fastg_gfa(final_path, fp_contigs, NULL, graph);
+                        //path_to_fastg_gfa(final_path, fp_contigs, NULL, graph);
+                        path_to_fasta(final_path, fp_contigs);
+                        if(gfa_fastg_output)
+                        {
+                            path_to_gfa2_and_fastg(final_path, graph, fp_contigs_gfa, fp_contigs_fastg);
+                        }
                     } else {
                         log_printf("Didn't write path of size %d\n", final_path->length);
                     }
@@ -313,4 +346,13 @@ AND AFTER IT ON CURRENT PATH
     /* Close files */
     fclose(fp_contigs);
     fclose(fp_analysis);
+    
+    // write the fastg footer
+    if(gfa_fastg_output)
+    {
+        fprintf(fp_contigs_fastg, "\n#FASTG:end;");
+        fclose(fp_contigs_fastg);
+        fclose(fp_contigs_gfa);
+    }
+    
 }
