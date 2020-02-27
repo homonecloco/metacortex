@@ -30,6 +30,7 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <time.h>
+#include <assert.h>
 #include "global.h"
 #include "binary_kmer.h"
 #include "flags.h"
@@ -439,6 +440,10 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
             log_and_screen_printf("ERROR: Can't open contig (gfa) file.\n%s\n", gfa_filename);
             exit(-1);
         }
+        
+        // write the header
+        fprintf(fp_contigs_gfa, "H\n");
+
     }
 
     /* Open the sugraph degree file */
@@ -707,10 +712,6 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         
                         if(gfa_fastg_output)
                         {
-                            if(fp_contigs_gfa!=NULL)
-                            {
-                                fprintf(fp_contigs_gfa, "H\n");
-                            }
                             path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
                         }
                         counter++;

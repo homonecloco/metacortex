@@ -1445,10 +1445,20 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     queue_push_step(step_queue, new_step);
     min_coverage = (int)(avg_coverage * 0.5  > 1 ? avg_coverage * 0.5 : 1);
     
+    // the step to return
     pathStep join_step;
     join_step.node = NULL;
     join_step.orientation = undefined;
     join_step.label = undefined;
+    
+    //check coverage:
+    Orientation next_orientation;
+    Nucleotide reverse_edge;
+    dBNode* next_node = db_graph_get_next_node(new_step->node, new_step->orientation, &next_orientation, new_step->label, &reverse_edge, db_graph);
+    if(element_get_coverage_all_colours(next_node) < min_coverage)
+    {
+        return join_step;
+    }
     
     boolean joined_path = false;
     boolean add_first_step = true;
@@ -1519,9 +1529,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
             bcp_array[base].coverage = 0;
             if(db_node_edge_exist_any_colour(junction_node, base, junction_orientation))
             {
-                Orientation next_orientation;
-                Nucleotide reverse_edge;
-                dBNode* next_node = db_graph_get_next_node(junction_node, junction_orientation, &next_orientation, base, &reverse_edge, db_graph);
+                next_node = db_graph_get_next_node(junction_node, junction_orientation, &next_orientation, base, &reverse_edge, db_graph);
                 if((next_orientation == forward && flags_check_for_flag(VISITED_FORWARD, &(next_node->flags))) || 
                    (next_orientation == reverse && flags_check_for_flag(VISITED_REVERSE, &(next_node->flags))) )
                 {
@@ -1585,14 +1593,11 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
         if(end > 0)
         {
             Path* new_path = path_new(end, alt_path->kmer_size);
-            
-            log_printf("[db_graph_search_for_bubble] Copying path from 0 to %i.\n", end);
+
             path_copy_subpath(new_path, alt_path, 0, end);
 
             join_step.node = alt_path->nodes[end];
             join_step.orientation = alt_path->orientations[end];            
-
-            log_printf("[db_graph_search_for_bubble] New path: %s, length %i.\n", new_path->seq, new_path->length);
 
              *new_path_ptr = new_path;
              

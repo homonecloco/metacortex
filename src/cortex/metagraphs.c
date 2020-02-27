@@ -41,6 +41,7 @@
 #include "perfect_path.h"
 #include "metagraphs.h"
 #include "cleaning.h"
+#include "metacortex.h"
 
 /*----------------------------------------------------------------------*
  * Function:                                                            *

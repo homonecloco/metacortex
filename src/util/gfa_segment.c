@@ -21,7 +21,7 @@
  * @param orientation - The orientation of the sequence, as to be used in the GFA file.
  * @return pointer to the segment.
  */
-gfa_segment* gfa_segment_new(int id, char* sequence, Orientation orientation)
+gfa_segment* gfa_segment_new(int id, char* sequence, Orientation orientation, double coverage)
 {
     gfa_segment* new_segment = malloc(sizeof(gfa_segment));
     int length = strlen(sequence);
@@ -30,6 +30,7 @@ gfa_segment* gfa_segment_new(int id, char* sequence, Orientation orientation)
     strcpy(new_segment->m_nucleotide_sequence, sequence);
     new_segment->m_segment_id = id;
     new_segment->m_orientation = orientation;
+    new_segment->m_coverage = coverage;
     return new_segment;
 }
 
@@ -54,11 +55,12 @@ void gfa_segment_destroy(gfa_segment* segment)
  */
 void write_gfa_segment(const gfa_segment* const segment, gfa_file_wrapper* gfa_file)
 {
-    fprintf(gfa_file->m_file, "S\tp%llds%i\t%lu\t%s\n", 
+    fprintf(gfa_file->m_file, "S\tp%llds%i\t%lu\t%s\tCV:f:%f\n", 
                         gfa_file->m_path_id,
                         segment->m_segment_id, 
                         strlen(segment->m_nucleotide_sequence), 
-                        segment->m_nucleotide_sequence);  
+                        segment->m_nucleotide_sequence,
+                        segment->m_coverage);  
 }
 
 /**
@@ -158,7 +160,7 @@ gfa_segment* gfa_segment_array_get(const gfa_segment_array* array, int i)
  * @param sequence
  * @param orientation
  */
-void gfa_segment_array_append(gfa_segment_array* array, int id, char* sequence, Orientation orientation)
+void gfa_segment_array_append(gfa_segment_array* array, int id, char* sequence, Orientation orientation, double coverage)
 {
     assert(array->m_length < array->m_max_size);
     if(array->m_length == array->m_max_size)
@@ -169,7 +171,7 @@ void gfa_segment_array_append(gfa_segment_array* array, int id, char* sequence, 
             return;            
         }
     }
-    gfa_segment* segment = gfa_segment_new(id, sequence, orientation);
+    gfa_segment* segment = gfa_segment_new(id, sequence, orientation, coverage);
     array->m_array[array->m_length++] = segment;
 }
 
@@ -206,7 +208,7 @@ void gfa_segment_array_merge(gfa_segment_array* dst_array, const gfa_segment_arr
     for(int i = 0; i < src_array->m_length; i++)
     {
         gfa_segment* segment = gfa_segment_array_get(src_array, i);
-        gfa_segment_array_append(dst_array, segment->m_segment_id, segment->m_nucleotide_sequence, segment->m_orientation);
+        gfa_segment_array_append(dst_array, segment->m_segment_id, segment->m_nucleotide_sequence, segment->m_orientation, segment->m_coverage);
     }
 }
 

@@ -313,6 +313,8 @@ void path_inner_iterator(void (*step_action) (pathStep * step), Path * path);
 
 int path_step_compare(pathStep * a, pathStep * b);
 
+void path_get_statistics_between_points(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path, int start, int end);
+
 void path_get_statistics(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path);
 
 boolean path_is_empty(Path * path);

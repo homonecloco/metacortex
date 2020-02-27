@@ -21,6 +21,7 @@ typedef struct
     int m_segment_id;
     char* m_nucleotide_sequence;
     Orientation m_orientation;
+    double m_coverage;
 } gfa_segment;
 
 typedef struct
@@ -37,7 +38,7 @@ typedef struct
     gfa_segment** m_array;
 } gfa_segment_array;
 
-gfa_segment* gfa_segment_new(int id, char* sequence, Orientation orientation);
+gfa_segment* gfa_segment_new(int id, char* sequence, Orientation orientation, double coverage);
 
 void gfa_segment_destroy(gfa_segment* segment);
 
@@ -47,7 +48,7 @@ void write_gfa_edge(const gfa_segment* const first_segment, const gfa_segment* c
 
 gfa_segment_array* gfa_segment_array_new(int inital_size);
 
-void gfa_segment_array_append(gfa_segment_array* array, int id, char* sequence, Orientation orientation);
+void gfa_segment_array_append(gfa_segment_array* array, int id, char* sequence, Orientation orientation, double coverage);
 
 void gfa_segment_array_merge(gfa_segment_array* dst_array, const gfa_segment_array* src_array);
 

@@ -70,6 +70,7 @@
 #include <perfect_path.h>
 #include <logger.h>
 #include <y_walk.h>
+#include <metacortex.h>
 
 static pathStep *get_next_step(pathStep * current_step, pathStep * next_step,
                                pathStep * reverse_step, dBGraph * db_graph)

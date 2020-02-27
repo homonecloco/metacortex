@@ -2081,32 +2081,41 @@ void path_print_contig_with_details(FILE * fout, Path * p){
 
 }
 
-void path_get_statistics(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path)
+void path_get_statistics_between_points(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path, int start, int end)
 {
-
     /**
-     * TODO: validate if the path is empty... think about singletons....
-     */
-    int i = flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 : 1;
+    * TODO: validate if the path is empty... think about singletons....
+    */
+    assert(end <= path->length);
+    assert(start >= 0);
+    assert(start < end);
+    int i = start;
+    if(i == 0)
+    {
+        i = flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 : 1;
+    }
     *max_coverage = 0;
     *min_coverage = INT_MAX;
     int sum_coverage = 0;
 
-    for (; i < path->length; i++) {	//Calculate the return values for the current path.
+    for (; i < end; i++) {	//Calculate the return values for the current path.
 
-        int coverage = element_get_coverage_all_colours(path->nodes[i]);
-        sum_coverage += coverage;
-        *max_coverage = (*max_coverage < coverage) ? coverage : *max_coverage;
-        *min_coverage = (*min_coverage > coverage) ? coverage : *min_coverage;
+      int coverage = element_get_coverage_all_colours(path->nodes[i]);
+      sum_coverage += coverage;
+      *max_coverage = (*max_coverage < coverage) ? coverage : *max_coverage;
+      *min_coverage = (*min_coverage > coverage) ? coverage : *min_coverage;
 
     }
-    int length = path_get_nodes_count(path);
-    *avg_coverage = (double)sum_coverage / (double)(length);
+    int length = end-start;
+    *avg_coverage = (double)sum_coverage / length;
 
     if (*min_coverage == INT_MAX) {
-        *min_coverage = 0;
-    }
-
+      *min_coverage = 0;
+    }  
+}
+void path_get_statistics(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path)
+{
+    path_get_statistics_between_points(avg_coverage, min_coverage, max_coverage, path, 0, path->length);
 }
 
 dBNode *path_last_node(Path * path)
@@ -3210,18 +3219,69 @@ out_struct write_paths_between_nodes(  Path* path,
     
     // construct the segment from start_pos up to current_pos
     int sequence_length = current_pos - start_pos;
+    
+    int path_coverage_max = path->nodes[start_pos]->coverage[0];
+    int path_coverage_min = path->nodes[start_pos]->coverage[0];
+    double path_coverage_avg = (double)path->nodes[start_pos]->coverage[0];
+    
+    if(fastg_recursion_level == 1)
+    {
+        int start_pos_for_coverage = 0;
+        if(in_segments != NULL)
+        {
+            start_pos_for_coverage = start_pos;
+            if(skip_first)
+            {
+                start_pos_for_coverage +=1;
+            }
+        }
+        int end_pos_for_coverage = start_pos_for_coverage == current_pos ? current_pos + 1 : current_pos;
+        assert(start_pos_for_coverage < end_pos_for_coverage);
+        path_get_statistics_between_points(&path_coverage_avg, &path_coverage_min, &path_coverage_max, path, start_pos_for_coverage, end_pos_for_coverage);
+    }
+    else
+    {
+        if(start_pos == 0)
+        {
+            // this is an "alt" route, so we want the coverage over the whole path
+            if(path->length > 1)
+            {
+                int start_pos_for_coverage = skip_first ? 1 : 0;
+                path_get_statistics_between_points(&path_coverage_avg, &path_coverage_min, &path_coverage_max, path, start_pos_for_coverage, path->length);
+            }
+            else
+            {
+                path_coverage_avg = path->nodes[0]->coverage[0];
+                path_coverage_min = path->nodes[0]->coverage[0];
+                path_coverage_max = path->nodes[0]->coverage[0];
+            }
+        }
+        else
+        {
+            // this is a section of the main path.
+            int start_pos_for_coverage = start_pos;
+            if(skip_first && start_pos < end_pos)
+            {
+                start_pos_for_coverage += 1;
+            }
+            int end_pos_for_coverage = current_pos == end_pos ? end_pos + 1 : current_pos + 1;
+            assert(start_pos_for_coverage < end_pos_for_coverage);
+            path_get_statistics_between_points(&path_coverage_avg, &path_coverage_min, &path_coverage_max, path, start_pos_for_coverage, end_pos_for_coverage);
+        }
+    }
+
+    
     gfa_segment_array* current_segment_array = gfa_segment_array_new(1);
     assert(sequence_length >= 0);
     if(sequence_length == 0)
     {
         if(in_segments == NULL)
         {
-             gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, first_kmer_string, forward);
-             write_gfa_segment_array(current_segment_array, file_gfa);
+            gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, first_kmer_string, forward, path_coverage_avg);
+            write_gfa_segment_array(current_segment_array, file_gfa);
         }
         else
         {
-            log_printf("Sequence of length 0, linking to previous segments.\n");
             gfa_segment_array_merge(current_segment_array, in_segments);
         }
     }
@@ -3237,13 +3297,11 @@ out_struct write_paths_between_nodes(  Path* path,
             char new_sequence[graph->kmer_size + sequence_length + 1];
             strcpy(new_sequence, first_kmer_string);
             strcat(new_sequence, sequence);
-            log_printf("Writing first segment: %s\n", new_sequence);
-            gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, new_sequence, forward);          
+            gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, new_sequence, forward, path_coverage_avg);          
         }
         else
         {
-            log_printf("Writing first segment: %s\n", sequence);
-            gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, sequence, forward);
+            gfa_segment_array_append(current_segment_array, (file_gfa->m_segment_count)++, sequence, forward, path_coverage_avg);
         }
         write_gfa_segment_array(current_segment_array, file_gfa);
 
@@ -3284,6 +3342,7 @@ out_struct write_paths_between_nodes(  Path* path,
     else
     {
         // for each subpath, backtrack until we find the first nucleotide where they differ.
+/*
         for(int i = 0; i < 4; ++i)
         {
             if(subpaths[i].m_path)
@@ -3305,6 +3364,7 @@ out_struct write_paths_between_nodes(  Path* path,
                 assert(subpaths[i].m_length >= 0);
             }
         } 
+*/
 
         // sort the subpaths by length (ascending)
         int compare(const void* a, const void* b)
@@ -3347,9 +3407,7 @@ out_struct write_paths_between_nodes(  Path* path,
             char alt_seq[alt_seq_length + 1];
             strncpy(alt_seq, subpaths[3].m_path->seq, alt_seq_length);
             alt_seq[alt_seq_length] = '\0';    
-            
-            log_printf("Writing sequence to fastg\n");           
-            log_printf("Main seq length: %i, alt seq length: %i\n", main_seq_length, alt_seq_length);
+
             fprintf(file_fastg, "%s", main_seq);
             write_fastg_alt(main_seq, alt_seq, file_fastg);
         }
@@ -3382,7 +3440,6 @@ out_struct write_paths_between_nodes(  Path* path,
                 // do the subpath            
                 if(main_end_pos >= 0)
                 {
-                    log_printf("Alt segment: %s, between %i and %i", subpaths[i].m_path->seq, 0, subpaths[i].m_length);
                     out_struct alt_out = write_paths_between_nodes(subpaths[i].m_path, 0, subpaths[i].m_length, graph, current_segment_array, true, file_gfa, file_fastg);
                     alt_segments = alt_out.m_segments;
                 }
@@ -3393,7 +3450,6 @@ out_struct write_paths_between_nodes(  Path* path,
                     int length = main_end_pos - main_start_pos;
                     if(length > 0)
                     {
-                        log_printf("Main segment: %s, between %i and %i\n", path->seq, main_start_pos, end_pos);
                         out_struct main_out = write_paths_between_nodes(path, main_start_pos, main_end_pos, graph, out_segments, true, file_gfa, file_fastg);
                         main_segments = main_out.m_segments;
                     }
@@ -3429,9 +3485,6 @@ out_struct write_paths_between_nodes(  Path* path,
             }
         }
         
-        log_printf("--------------------------\n");
-    
-        log_printf("Continuing from pos %i\n", polymorphism_end_pos);
         // All return segments finish at the same place, end_node, so we continue from there.      
         //int new_start_pos = polymorphism_end_pos - overlap_between_paths;
         int new_start_pos = polymorphism_end_pos;
