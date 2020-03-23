@@ -80,6 +80,7 @@
 #include "metagraphs.h"
 #include "graph_stats.h"
 #include "bubble_find.h"
+#include "subtractive_walk.h"
 
 typedef struct {
     char* filename;
@@ -504,6 +505,17 @@ int main(int argc, char **argv)
                 //db_graph_walk_branches(char *filename, int total_max_length, int bubble_max_length, int bubble_max_depth, dBGraph * db_graph)
                 //metacortex_find_subgraphs(db_graph, cmd_line.output_fasta_filename, cmd_line.min_subgraph_size, cmd_line.min_contig_length, cmd_line.multiple_subgraph_contigs);
                 break;
+            case SUBTRACTIVE_WALK:
+                 // pass path_coverage_minimum value to dBgraph for use later
+                db_graph->path_coverage_minimum = cmd_line.path_coverage_minimum;
+                log_and_screen_printf("\nPerforming iterative subtractive walk..\n");       
+                subtractive_walk(db_graph, cmd_line.output_fasta_filename,
+                    cmd_line.min_subgraph_size, cmd_line.min_contig_length,
+                    cmd_line.max_node_edges, cmd_line.delta_coverage,
+                    cmd_line.linked_list_max_size,
+                    cmd_line.multiple_subgraph_contigs);
+                break;
+                
             default:
                 log_and_screen_printf("Algorithm not implemented \n");
                 break;

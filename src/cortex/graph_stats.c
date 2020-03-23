@@ -709,7 +709,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         // NOTE: decision - minimum cov or average cov dictates confidence threshold met?
                         // Output for alternative formats
                         path_to_fasta(simple_path, fp_contigs_fasta);
-                        
+                                               
                         if(gfa_fastg_output)
                         {
                             path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
@@ -729,9 +729,10 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         queue_node = (dBNode*)queue_pop(graph_queue);
                         db_node_action_unset_flag(queue_node, VISITED);
                     }
+                    
+
                     // Now disconnect path from other nodes and mark path as visited, so it's not visited again //
                     for (i=0; i<simple_path->length; i++) {
-
                         if (simple_path->step_flags[i] & X_NODE)
                         {
                             log_printf("[x-NODE IN PATH RETAINED]\n");
@@ -745,6 +746,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         }
 
                     }
+
 
                     /* Reset paths */
                     path_reset(simple_path);

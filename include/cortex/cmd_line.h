@@ -71,7 +71,8 @@ typedef enum{
     BUBBLES = 3,
     READ_PAIR = 5,
     METACORTEX_CONSENSUS = 6,
-    GRAPH_STATS = 7
+    GRAPH_STATS = 7,
+    SUBTRACTIVE_WALK = 8,           
 }TraverseAlgorithm;
 
 typedef struct

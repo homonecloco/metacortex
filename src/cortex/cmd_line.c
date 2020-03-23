@@ -239,12 +239,13 @@ CmdLine parse_cmdline(int argc, char *argv[], int unit_size)
         {"delta_coverage", required_argument, NULL, 'R'},  // using still available letters
         {"graph_stats", no_argument, NULL, 'S'},
         {"threads", required_argument, NULL, 'T'},
+        {"subtractive_walk", no_argument, NULL, 'U'},
         {"graphviz", required_argument, NULL, 'V'},
         {0, 0, 0, 0}
     };
 
     while ((opt = getopt_long(argc, argv,
-                              "ab:c:d:ef:g:hi:jk:l:m:n:o:p:q:r:s:t:uvw:x:y:z:A:B:C:D:E:FGH:I:J:K:L:MN:O:P:R:STV:Z:",
+                              "ab:c:d:ef:g:hi:jk:l:m:n:o:p:q:r:s:t:uvw:x:y:z:A:B:C:D:E:FGH:I:J:K:L:MN:O:P:R:STUV:Z:",
                               long_options, &longopt_index)) > 0)
     {
         //Parse the default options
@@ -620,6 +621,9 @@ CmdLine parse_cmdline(int argc, char *argv[], int unit_size)
                 if (check != 0 ) {
                     errx(1, "[-T | --threads INT] has to be a power of two. ");
                 }
+                break;
+            case 'U':
+                cmd_line.algorithm=SUBTRACTIVE_WALK;
                 break;
             case 'V':
                 if (optarg == NULL) {
