@@ -2118,6 +2118,24 @@ void path_get_statistics(double *avg_coverage, int *min_coverage, int *max_cover
     path_get_statistics_between_points(avg_coverage, min_coverage, max_coverage, path, 0, path->length);
 }
 
+void path_get_coverage_standard_deviation(double* standard_deviation, double avg_coverage, Path* path)
+{
+    int i = 0;
+    i = flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 : 1;
+    
+    int sum_deviations = 0;
+
+    for (; i < path->length; i++) 
+    {	//Calculate the return values for the current path.
+
+      int coverage = element_get_coverage_all_colours(path->nodes[i]);
+      double diff = (avg_coverage - coverage) * (avg_coverage - coverage);
+      sum_deviations += diff;
+    }
+
+    *standard_deviation = sqrt(sum_deviations/(path->length - 1));
+}
+
 dBNode *path_last_node(Path * path)
 {
     return path->length > 0 ? path->nodes[path->length - 1] : NULL;

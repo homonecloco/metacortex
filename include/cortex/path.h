@@ -317,6 +317,8 @@ void path_get_statistics_between_points(double *avg_coverage, int *min_coverage,
 
 void path_get_statistics(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path);
 
+void path_get_coverage_standard_deviation(double* standard_deviation, double avg_coverage, Path* path);
+
 boolean path_is_empty(Path * path);
 
 boolean path_is_cycle(Path * path);
