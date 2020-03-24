@@ -5,6 +5,9 @@
  * History: 12-Aug-10: RML: Created                                     *
  *----------------------------------------------------------------------*/
 
+#ifndef NODE_QUEUE_H
+#define NODE_QUEUE_H
+
 /*----------------------------------------------------------------------*
  * Structures                                                           *
  *----------------------------------------------------------------------*/
@@ -41,3 +44,5 @@ dBNode* queue_pop_node(Queue* q, int* d);
  *----------------------------------------------------------------------*/
 pathStep* queue_push_step(Queue* q, pathStep* step);
 pathStep* queue_pop_step(Queue* q);
+
+#endif // NODE_QUEUE_H

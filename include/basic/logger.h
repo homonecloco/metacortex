@@ -59,6 +59,8 @@
  * logger.h
  ************************************************************************/
 
+#ifndef LOGGER_H
+#define LOGGER_H
 /*----------------------------------------------------------------------*
  * File:    logger.c                                                    *
  * Purpose: Handle debugging/log files.                                 *
@@ -77,3 +79,5 @@ void log_get_timestamp(char* buffer);
 void log_write_timestamp(int newline);
 void log_progress_bar(int percentage);
 void log_set_screen(FILE * f);
+
+#endif // LOGGER_H

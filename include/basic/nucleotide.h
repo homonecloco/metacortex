@@ -57,14 +57,14 @@
  * nucleotide.h
  ************************************************************************/
 
-#ifndef nucleotide_h
-#define nucleotide_h
+#ifndef NUCLEOTIDE_H
+#define NUCLEOTIDE_H
 
 typedef enum {
     Adenine = 0, Cytosine = 1, Guanine = 2, Thymine = 3, Undefined = 4
     //Never used for the binary representation of a kmer!.
 } Nucleotide;
 
-#endif
+#endif // NUCLEOTIDE_H
 
 // maybe multistae chars here W=AT, S=CG, M=AC, K=GT, R=AG, Y=CT

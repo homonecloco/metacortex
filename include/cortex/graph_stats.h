@@ -24,11 +24,11 @@
 /************************************************************************
  * graph_stats.h
  ************************************************************************/
+#ifndef GRAPH_STATS_H
+#define GRAPH_STATS_H
 
 #include <binary_kmer.h>
-
-#ifndef GRAPHINFO_H
-#define GRAPHINFO_H
+#include <node_queue.h>
 
 typedef struct {
     int total_size;
@@ -49,6 +49,10 @@ typedef struct {
     int highest_cov;
 } GraphInfo;
 
+int grow_graph_from_node_stats( dBNode* start_node, dBNode** best_node, 
+                                dBGraph* graph, Queue* graph_queue, 
+                                GraphInfo* nodes_in_graph, float delta);
+
 void find_subgraph_stats(   dBGraph* graph, char* consensus_contigs_filename, 
                             int min_subgraph_kmers, int min_contig_size, 
                             int max_node_edges, float delta_coverage, 
@@ -63,4 +67,4 @@ void new_GraphInfo(GraphInfo * info);
 
 int explore_subgraphs(dBNode* start_node, dBGraph* graph, GraphInfo* nodes_in_graph);
 
-#endif /* GRAPHINFO_H */
+#endif /* GRAPH_STATS_H */

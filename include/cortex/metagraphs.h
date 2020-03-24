@@ -24,6 +24,8 @@
 /************************************************************************
  * metagraphs.h
  ************************************************************************/
+#ifndef METAGRAPHS_H
+#define METAGRAPHS_H
 
 #define MAX_SEEDS 200000000
 #define METACORTEX_QUEUE_SIZE 20000000 // 10000000
@@ -48,3 +50,5 @@ typedef struct {
 
 void metacortex_find_subgraphs( dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, 
                                 boolean multiple_subgraph_contigs, boolean gfa_fastg_output);
+
+#endif // METAGRAPHS_H

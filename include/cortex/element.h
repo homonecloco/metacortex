@@ -62,15 +62,14 @@
  * are prefixed with element_
  * The de Bruijn based routines are prefixed with db_node
  ************************************************************************/
+#ifndef ELEMENT_H_
+#define ELEMENT_H_
 
 #include <global.h>
 #include <nucleotide.h>
 #include <seq.h>
 #include <binary_kmer.h>
 #include <flags.h>
-
-#ifndef ELEMENT_H_
-#define ELEMENT_H_
 
 #ifndef NUMBER_OF_COLOURS
 #define NUMBER_OF_COLOURS 1

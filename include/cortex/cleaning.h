@@ -62,6 +62,9 @@
 #ifndef CLEANING_H_
 #define CLEANING_H_
 
+#include "dB_graph.h"
+#include "element.h"
+
 typedef struct {
     int tip_length;
     int tips_removed;

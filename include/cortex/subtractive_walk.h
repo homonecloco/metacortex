@@ -4,7 +4,8 @@
  *
  * Authors:
  *     Richard M. Leggett (richard.leggett@earlham.ac.uk) and
- *     Martin Ayling (martin.ayling@earlham.ac.uk)
+ *     Martin Ayling (martin.ayling@earlham.ac.uk) and 
+ *     Samuel Martin (samuel.martin@earlham.ac.uk)
  *
  * MetaCortex is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,11 +23,8 @@
  ************************************************************************/
 
 /************************************************************************
- * graph_stats.h
+ * subtractive_walk.h
  ************************************************************************/
-
-#include <binary_kmer.h>
-
 #ifndef SUBTRACTIVE_WALK_H
 #define SUBTRACTIVE_WALK_H
 

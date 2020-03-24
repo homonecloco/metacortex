@@ -4,6 +4,8 @@
  * Author:  Richard Leggett                                             *
  * History: 15-Feb-11: RML: Created                                     *
  *----------------------------------------------------------------------*/
+#ifndef GRAPH_FORMATS_H
+#define GRAPH_FORMATS_H
 
 #define MAX_KMER 95
 #define MAX_NODES 10000
@@ -94,3 +96,5 @@ void write_gml_footer(FILE* fp, GraphToolsOptions* options);
 void write_gml_node(FILE* fp, GraphoutNode* n, GraphToolsOptions* options);
 void write_gml_edge(FILE* fp, GraphoutEdge* e, GraphToolsOptions* options);
 GraphFileFormat* setup_file_format_gml(GraphFileFormat* gff);
+
+#endif //GRAPH_FORMATS_H

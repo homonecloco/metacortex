@@ -59,8 +59,8 @@
  * seq_io.h
  ************************************************************************/
 
-#ifndef seq_io_h
-#define seq_io_h
+#ifndef SEQ_IO_H
+#define SEQ_IO_H
 
 #define MAX_FIELD_SIZE 20
 
@@ -99,4 +99,4 @@ void append_sequence_fh(FILE * filename, Sequence * seq, FileFormat format);
 
 void * new_sequence_header(sequence_header_type header_type);
 
-#endif
+#endif // SEQ_IO_H

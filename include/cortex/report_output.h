@@ -24,6 +24,8 @@
 /************************************************************************
  * report_output.h
  ************************************************************************/
+#ifndef REPORT_OUTPUT_H
+#define REPORT_OUTPUT_H
 
 #include "dB_graph.h"
 #include "graph_stats.h"
@@ -43,3 +45,5 @@ void writeLaTeXreport_to_log_and_screen(int MAX_BRANCHES, int COVERAGE_BIN_SIZE,
                                         long int * Coverage_Dist, dBGraph * graph, GraphInfo * nodes_in_graph);
 
 int sum_array(long int * array, int first, int last);
+
+#endif // REPORT_OUTPUT_H
