@@ -4,7 +4,7 @@
  *
  * Authors:
  *     Richard M. Leggett (richard.leggett@earlham.ac.uk) and
- *     Martin Ayling (martin.ayling@earlham.ac.uk)
+ *     Martin Ayling (martin.ayling@earlham.ac.uk) and
  *     Samuel Martin (samuel.martin@earlham.ac.uk)
  *
  * MetaCortex is free software: you can redistribute it and/or modify
@@ -32,32 +32,23 @@
 #include <unistd.h>
 #include <time.h>
 #include <assert.h>
-#include "global.h"
-#include "binary_kmer.h"
-#include "flags.h"
-#include "element.h"
-#include "seq.h"
-#include "open_hash/hash_table.h"
-#include "file_reader.h"
-#include "dB_graph.h"
-#include "logger.h"
-#include "graph_tools.h"
-#include "graph_formats.h"
-#include "node_queue.h"
-#include "coverage_walk.h"
-#include "perfect_path.h"
-#include "graph_stats.h"
+
 #include "cleaning.h"
+#include "coverage_walk.h"
+#include "dB_graph.h"
+#include "element.h"
+#include "graph_stats.h"
+#include "logger.h"
 #include "metacortex.h"
 #include "metagraphs.h"
-#include "report_output.h"
-#include "graph_stats.h"
+#include "subtractive_walk.h"
 
 #define COVERAGE_BINS 10
 #define COVERAGE_BIN_SIZE 1
 #define MAX_BRANCHES 10
 #define GRAPH_LOG10_LIMIT 10 // little hacky to do this here, because it needs to match size of subgraph_dist in graph_stats.h
 #define NUM_BEST_NODES 5
+
 
 // ----------------------------------------------------------------------
 // Work through graph, count coverage, X, Y nodes
@@ -184,12 +175,6 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
             new_path->length=1;
             * path_length += new_path->length;
             path_destroy(new_path);
-            
-            // is this essentially:
-            //  if (db_node_edge_exist_any_colour(node, n, orientation)) {
-            //      * path_length += 1;
-            //  }
-            // ???
         }
     }
 
@@ -296,7 +281,6 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
             log_printf("\nGrowing graph from node");
             graph_queue->number_of_items = 0;
 
-            timestamp_gs();
             log_printf("\n");
 
             // now with a subgraph, walk the graph counting degrees by graph
@@ -345,7 +329,6 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
             log_printf("\nGrowing graph from node");
             graph_queue->number_of_items = 0;
 
-            timestamp_gs();
             log_printf("\n");
 
             // now with a subgraph, walk the graph counting degrees by graph
@@ -384,12 +367,19 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
 
                         // could save the path walking again here if needed, hold these figures in path structure
                         double average_coverage=0;
+                        double standard_deviation = 0;
                         int min_coverage=0;
                         int max_coverage=0;
                         path_get_statistics(&average_coverage, &min_coverage, &max_coverage, simple_path);
+                        path_get_coverage_standard_deviation(&standard_deviation, average_coverage, simple_path);
                         // NOTE: decision - minimum cov or average cov dictates confidence threshold met?
                         // Output for alternative formats
                         path_to_fasta(simple_path, fp_contigs_fasta);
+                        
+                        if(min_coverage < average_coverage - 2 * standard_deviation)
+                        {
+                            min_coverage = average_coverage - 2 * standard_deviation;
+                        }
                         
                         for(i = 0; i < simple_path->length; i++) 
                         {
@@ -439,12 +429,10 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
     } // traversal_for_contigs
 
     // check each node in the graph, FLAG X&Y nodes (mark all nodes as visited)
-    timestamp_gs();
     log_and_screen_printf("Stats traversal started...");
     hash_table_traverse(&stats_traversal, graph);
     log_and_screen_printf("DONE\n");
 
-    timestamp_gs();
     // first line for stats output file
     fprintf(fp_analysis, "\n#Subgraph sizes\n");
     log_and_screen_printf("Graph size traversal started...");
@@ -460,7 +448,6 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
     }
     log_and_screen_printf("Unique kmers after clearing:\t %lld\n", graph->unique_kmers);
 
-    timestamp_gs();
     db_graph_reset_flags(graph);
     // second travesal - build subgraphs out, produce contigs
     log_and_screen_printf("Full traversal started...");
