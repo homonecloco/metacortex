@@ -226,6 +226,8 @@ void path_increase_id(Path * path);
 
 void path_to_fasta(Path * path, FILE * fout);
 
+void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage, int min_coverage, int max_coverage);
+
 void path_to_fastg_gfa(Path * path, FILE * fout, FILE * fout2, HashTable* graph);
 
 void path_to_fasta_debug(Path * path, FILE * fout);

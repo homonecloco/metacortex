@@ -1460,7 +1460,7 @@ void path_to_fastg_gfa(Path * path, FILE * file_fastg, FILE * file_gfa, HashTabl
     destroy_gfa_stats(gfa_count);
 }
 
-void path_to_fasta(Path * path, FILE * fout)
+void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage, int min_coverage, int max_coverage)
 {
     short kmer_size = path->kmer_size;
     int length = path->length;
@@ -1484,15 +1484,6 @@ void path_to_fasta(Path * path, FILE * fout)
     if (length == max_length) {
         log_and_screen_printf("contig length equals max length [%i] for node_%i\n", max_length, path->id);
     }
-
-    // Set value of PRINT_FIRST (whether first node included)
-    //check_print_first(path);
-
-    // Get coverage statistics from path
-    double avg_coverage;
-    int min_coverage;
-    int max_coverage;
-    path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, path);
 
     // Get orientation of first and last node
     Orientation fst_orientation;
@@ -1595,7 +1586,17 @@ void path_to_fasta(Path * path, FILE * fout)
     }
     fprintf(fout, "\n");
 
-    fflush(fout);
+    fflush(fout);    
+}
+
+void path_to_fasta(Path * path, FILE * fout)
+{
+    // Get coverage statistics from path
+    double avg_coverage;
+    int min_coverage;
+    int max_coverage;
+    path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, path);
+    path_to_fasta_with_statistics(path, fout, avg_coverage, min_coverage, max_coverage);
 }
 
 // Cloned from path_to_fasta with changes for file colour coding
@@ -2120,14 +2121,18 @@ void path_get_statistics(double *avg_coverage, int *min_coverage, int *max_cover
 
 void path_get_coverage_standard_deviation(double* standard_deviation, double avg_coverage, Path* path)
 {
+    if(path->length == 1)
+    {
+        *standard_deviation = 0;
+        return;
+    }
     int i = 0;
     i = flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 : 1;
     
     int sum_deviations = 0;
 
     for (; i < path->length; i++) 
-    {	//Calculate the return values for the current path.
-
+    {
       int coverage = element_get_coverage_all_colours(path->nodes[i]);
       double diff = (avg_coverage - coverage) * (avg_coverage - coverage);
       sum_deviations += diff;
