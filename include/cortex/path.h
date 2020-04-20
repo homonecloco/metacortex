@@ -149,6 +149,8 @@ typedef struct {
 
     Flags stop_reasons_first;
     Flags stop_reasons_last;
+    
+    short subpath_id;
 
 } Path;
 
@@ -273,6 +275,8 @@ pathStep * path_get_last_step(pathStep * ps, Path * path);
 int path_index_of_step(pathStep * step, Path * path);
 
 int path_get_length(Path * path);
+
+PathArray * path_split_at_min_coverages(Path * p, int min_coverage);
 
 PathArray * path_split_in_perfect_paths(Path * p);
 

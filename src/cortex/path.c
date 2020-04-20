@@ -126,6 +126,7 @@ Path *path_new(int max_length, short kmer_size)
     //	path->depth = -1;
     path->header = 0;
     path->used = false;
+    path->subpath_id = 0;
 
     if ((!path->nodes) || (!path->orientations) || (!path->labels) || (!path->seq)) {
         free(path);
@@ -1490,7 +1491,7 @@ void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage
 
     fst_orientation = path->orientations[0];
 
-    Orientation lst_orientation = path->orientations[path->length];
+    Orientation lst_orientation = path->orientations[path->length - 1];
 
     // Get the first node - this will be nodes[0] if PRINT_FIRST is
     // specified, or nodes[1] otherwise.
@@ -1546,11 +1547,21 @@ void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage
         binary_kmer_assignment_operator(lst_kmer, tmp_kmer);
     }
     binary_kmer_to_seq(&lst_kmer, kmer_size, lst_seq);
+    
+    char* path_id;
+    if(path->subpath_id == 0)
+    {
+        asprintf(&path_id, "node_%qd", path->id);
+    }
+    else
+    {
+        asprintf(&path_id, "node_%qd.%hi", path->id, path->subpath_id);
+    }
 
     // Output to file
     fprintf(fout,
-            ">node_%qd length:%i average_coverage:%.2f min_coverage:%i max_coverage:%i fst_coverage:%i fst_r:%s fst_f:%s lst_coverage:%i lst_r:%s lst_f:%s\n",
-            path->id,
+            ">%s length:%i average_coverage:%.2f min_coverage:%i max_coverage:%i fst_coverage:%i fst_r:%s fst_f:%s lst_coverage:%i lst_r:%s lst_f:%s\n",
+            path_id,
             (flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? length + kmer_size : length + kmer_size - 1), avg_coverage,
             min_coverage,
             max_coverage,
@@ -1562,7 +1573,9 @@ void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage
             (lst_orientation == forward ? lst_f : lst_r));
 
     binary_kmer_to_seq(&fst_kmer, flags_check_for_flag(PRINT_FIRST,	&(path->flags)) ? kmer_size : kmer_size - 1, fst_seq);
-
+    
+    free(path_id);
+    
     int i, current= 1;
 
     for(i = 0, current = 1 ; i < path->kmer_size; i++, current++) {
@@ -2913,7 +2926,7 @@ boolean path_copy_subpath(Path* dest_path, const Path* source_path, int start, i
     assert(source_path != NULL);
     assert(end - start > 0);
     assert(start >= 0);
-    assert(end < source_path->length);
+    assert(end <= source_path->length);
     if(dest_path == NULL)
     {
         // some error message
@@ -2928,7 +2941,7 @@ boolean path_copy_subpath(Path* dest_path, const Path* source_path, int start, i
     }
     
     path_reset(dest_path);  
-    for(int i = 0; i < length; i++)
+    for(int i = start; i < end; i++)
     {
         pathStep next_step;
         next_step.node = source_path->nodes[i];
@@ -2945,15 +2958,17 @@ boolean path_copy_subpath(Path* dest_path, const Path* source_path, int start, i
             printf("[path_copy_subpath] Error: Could not copy subpath. Attempting to add node with kmer %s failed.", kmer_string);
             return false;          
         }
-        for(int i = 0; i < dest_path->length; i++)
+    }
+    
+    for(int j = 0; j < dest_path->length-1; j++)
+    {
+        if(dest_path->seq[j] == '\0')
         {
-            if(dest_path->seq[i] == '\0')
-            {
-                printf("[path_copy_subpath] Warning: path with irregular sequence. Sequence: %s, length: %i.\n", dest_path->seq, dest_path->length);
-            }
+            printf("[path_copy_subpath] Warning: path with irregular sequence. Sequence: %s, length: %i.\n", dest_path->seq, dest_path->length);
         }
     }
     dest_path->flags = source_path->flags;
+    dest_path->id = source_path->id;
     return true;
 }
 
@@ -3534,4 +3549,44 @@ out_struct write_paths_between_nodes(  Path* path,
         
         return out;
     }
+}
+
+PathArray* path_split_at_min_coverages(Path* path, int min_coverage)
+{
+    assert(path != NULL);
+    assert(path_get_length(path) > 0);
+    PathArray* pa = path_array_new(2);
+    
+    int start = 0;
+    short subpath_id = 1;
+    for(int i = 0; i < path->length; ++i)
+    {
+        dBNode* current_node = path->nodes[i];
+        if(current_node->coverage[0] < min_coverage)
+        {
+            if(i - start > 0)
+            {
+                int length = i - start;
+                Path* new_subpath = path_new(length + 1, path->kmer_size);
+                new_subpath->id = path->id;
+                new_subpath->subpath_id = subpath_id++;
+                path_copy_subpath(new_subpath, path, start, i);
+                path_array_add_path(new_subpath, pa);
+            }
+            start = i + 1;                  
+        }
+    }
+    
+    // add the last path
+    if(start != 0 && start < path->length)
+    {
+        int length = path->length - start;
+        Path* new_subpath = path_new(length + 1, path->kmer_size);
+        new_subpath->id = path->id;
+        new_subpath->subpath_id = subpath_id;
+        path_copy_subpath(new_subpath, path, start, path->length);
+        path_array_add_path(new_subpath, pa);
+    }
+    
+    return pa;
 }

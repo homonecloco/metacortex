@@ -43,8 +43,6 @@
 #include "metagraphs.h"
 #include "subtractive_walk.h"
 
-#define COVERAGE_BINS 10
-#define COVERAGE_BIN_SIZE 1
 #define MAX_BRANCHES 10
 #define GRAPH_LOG10_LIMIT 10 // little hacky to do this here, because it needs to match size of subgraph_dist in graph_stats.h
 #define NUM_BEST_NODES 5
@@ -57,27 +55,12 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
                          int min_subgraph_kmers, int min_contig_size, int max_node_edges, float delta_coverage,
                          int linked_list_max_size, int walk_paths)
 {
-    FILE* fp_analysis;
-    FILE* fp_report;
-    FILE* fp_degrees;
     FILE* fp_contigs_fasta;
-    long int Contig_Branches[MAX_BRANCHES];
     char* seq = calloc(256, 1);
     long int total_nodes = 0;
-    int i;  int j;
+    int i;
     int counter= 0;
     int min_distance = 0; //10 * (graph->kmer_size);  // NOTE: needs to be a cmd_line option
-
-    char cwd[1024];
-
-    if (getcwd(cwd, sizeof(cwd)) != NULL){
-        // do NOTHING
-    }
-    else{
-        log_and_screen_printf("CWD command returned NULL\n");
-    }
-
-    char*  graph_wd = calloc(256, 1);
 
     Path *simple_path = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
     Path *path_fwd = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
@@ -86,77 +69,15 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
     GraphInfo* nodes_in_graph = calloc(1,sizeof(GraphInfo));
     new_GraphInfo(nodes_in_graph);
 
-    // array to bin coverage 0-5, 5-10, 10-15..95-100
-    long int Coverage_Dist[COVERAGE_BINS*COVERAGE_BIN_SIZE]; // will this work?
-    char analysis_filename[256];
-    char degrees_filename[256];
 
     Queue* graph_queue;
-    for(i=0;i<MAX_BRANCHES;i++){
-        Contig_Branches[i]=0;
-    }
-    // Initialise Coverage_Dist  int i;
-    for(i=0;i<(COVERAGE_BINS*COVERAGE_BIN_SIZE);i++){
-        Coverage_Dist[i]=0;
-    }
 
-
-    /* Open contigs file */
+   /* Open contigs file */
     fp_contigs_fasta = fopen(consensus_contigs_filename, "w");
     if (!fp_contigs_fasta) {
         log_and_screen_printf("ERROR: Can't open contig file.\n%s\n", consensus_contigs_filename);
         exit(-1);
     }
-
-    remove_file_extension(consensus_contigs_filename);
-
-    /* Open the analysis file */
-    sprintf(analysis_filename, "%s.analysis", consensus_contigs_filename);
-    fp_analysis = fopen(analysis_filename, "w");
-    if (!fp_analysis) {
-        log_and_screen_printf("ERROR: Can't open analysis file.\n");
-        exit(-1);
-    }
-
-    /* Open the sugraph degree file */
-    sprintf(degrees_filename, "%s.degrees", consensus_contigs_filename);
-    fp_degrees = fopen(degrees_filename, "w");
-    if (!fp_degrees) {
-        log_and_screen_printf("ERROR: Can't open degrees file.\n");
-        exit(-1);
-    }
-
-    // check for graphs dir existance
-    if (basename(consensus_contigs_filename)==consensus_contigs_filename){
-        log_and_screen_printf("(Relative path for contig output given, prefixing CWD)\n");
-        // returns '.' which breaks other paths later on
-        sprintf(graph_wd, "%s/graphs/", cwd);
-    }
-    else{
-        // dirname modifies 'consensus_contigs_filename' on some platforms, shifted in here to avoid that
-        sprintf(graph_wd, "%s/graphs/", dirname(consensus_contigs_filename));
-        sprintf(analysis_filename, "%s%s.tex", graph_wd, basename(consensus_contigs_filename));
-    }
-
-    mkdir(graph_wd, 777);
-
-    log_and_screen_printf("graphs dir\t%s\n", graph_wd);
-    log_and_screen_printf("graphs\t%s\n", analysis_filename);
-
-    /* Open the DIGEST file */
-    fp_report = fopen(analysis_filename, "w");
-    if (!fp_report) {
-        log_and_screen_printf("ERROR: Can't open analysis (DIGEST) file.\n\t%s\n", analysis_filename);
-        exit(-1);
-    }
-
-    // header line for degrees file
-    for(i=0;i<5;i++){
-        for(j=0;j<5;j++){
-            fprintf(fp_degrees,"for[%d]rev[%d]\t", i, j);
-        }
-    }
-    fprintf(fp_degrees,"total\n");
 
     db_graph_reset_flags(graph);
 
@@ -200,8 +121,6 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
         //   count length
         //   average length > kmer?
 
-        Contig_Branches[all_edges-1]++;
-
         if ((all_edges>2) && (all_edges<=max_node_edges)){
 
             if (linked_list_max_size){
@@ -233,12 +152,6 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
         // PARTITIONING - REMOVE EXTREMELY BRANCHED NODES
         if ((all_edges<=max_node_edges) && (local_distance>=min_distance))
         {
-            if(this_coverage>COVERAGE_BINS*COVERAGE_BIN_SIZE-1)
-            {
-                this_coverage = COVERAGE_BINS*COVERAGE_BIN_SIZE-1;
-            }
-
-            Coverage_Dist[this_coverage]++;
             total_nodes++;
 
             // Look for Y shape branch forward orientation
@@ -292,12 +205,9 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
             else if (nodes_in_graph->total_size) {
                 // print out the size of the current subgraph
                 log_printf("graph size\t%i\n",nodes_in_graph->total_size);
-                fprintf(fp_analysis, "%i\t%i\t",nodes_in_graph->branch_nodes,nodes_in_graph->total_size);
                 binary_kmer_to_seq(&nodes_in_graph->highest_cov_in_subgraph, graph->kmer_size, seq);
-                fprintf(fp_analysis, "%s\n", seq);
 
                 // update graph wide stats
-                print_degree_stats(nodes_in_graph, fp_degrees);
                 if (nodes_in_graph->total_size>nodes_in_graph->largest_subgraph) {
                     nodes_in_graph->largest_subgraph=nodes_in_graph->total_size;
                 }
@@ -319,112 +229,93 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
     } // end of &explore_graph_size
 
     // Hash table iterator to walk graphs, produce paths
-    void traversal_for_contigs(dBNode * node) {
-        if(db_node_check_for_any_flag(node, PRUNED | VISITED) == false){
-
-            dBNode* seed_node;
+    void traversal_for_contigs(dBNode * node) 
+    {
+        if(db_node_check_for_any_flag(node, PRUNED | VISITED) == false)
+        {
+            dBNode* seed_node = node;
             initialise_GraphInfo(nodes_in_graph);
 
             // Grow graph from this node, returning the 'best' (highest coverage) node to store as seed point
             log_printf("\nGrowing graph from node");
             graph_queue->number_of_items = 0;
 
-            log_printf("\n");
+            int kmer_size = graph->kmer_size;
+            char kmer_string[kmer_size + 1];
+            binary_kmer_to_seq(&seed_node->kmer, kmer_size, kmer_string);
+            log_printf("Seed node: %s\n", kmer_string);
+            /* enough nodes to bother with? If so, get consensus contig */
+            if (walk_paths && (nodes_in_graph->total_size >= min_subgraph_kmers)) 
+            {
+                // should be a perfect path? might be two paths though, if we started in the middle
+                // NOTE: unecessary coverage element but repeating the whole path finding without coverage
+                //  is more work than necessary I think. See what processing time it changes?
+                coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd);
+                coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev);
 
-            // now with a subgraph, walk the graph counting degrees by graph
-            // - this sets VISITED flag as true for many of the nodes in the graph.
-            grow_graph_from_node_stats(node, &seed_node, graph, graph_queue, nodes_in_graph, delta_coverage);
+                path_reverse(path_fwd, simple_path);
+                path_append(simple_path, path_rev);
 
-            if (nodes_in_graph->total_size ==1) {
-                // ignore; pruned node
-                cleaning_prune_db_node(node, graph);
-                db_node_action_set_flag(node, VISITED);
-                log_printf("\t[Singleton pruned.]\n");
-            }
-            else if (seed_node == NULL) {
-                printf("ERROR: Seed node is NULL, nodes in graph is %d\n", nodes_in_graph->total_size);
-            } else if (nodes_in_graph->total_size) {
-                int kmer_size = graph->kmer_size;
-                char kmer_string[kmer_size + 1];
-                binary_kmer_to_seq(&seed_node->kmer, kmer_size, kmer_string);
-                log_printf("Seed node: %s\n", kmer_string);
-                /* enough nodes to bother with? If so, get consensus contig */
-                if (walk_paths && (nodes_in_graph->total_size >= min_subgraph_kmers)) {
+                simple_path->id = counter++;
 
-                    // should be a perfect path? might be two paths though, if we started in the middle
-                    // NOTE: unecessary coverage element but repeating the whole path finding without coverage
-                    //  is more work than necessary I think. See what processing time it changes?
-                    coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd);
-                    coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev);
+                log_printf("Write path of size %d\n", simple_path->length);
+                log_printf("graph size\t%i\n",nodes_in_graph->total_size);
 
-                    path_reverse(path_fwd, simple_path);
-                    path_append(simple_path, path_rev);
+                double average_coverage = 0;
+                int min_coverage = 0;
+                int max_coverage = 0;
+                path_get_statistics(&average_coverage, &min_coverage, &max_coverage, simple_path);
 
-                    simple_path->id = counter;
-                    if (simple_path->length > (min_contig_size - graph->kmer_size)) {
-                        log_printf("Write path of size %d\n", simple_path->length);
-                        log_printf("graph size\t%i\n",nodes_in_graph->total_size);
+                int min_allowed_coverage = (int)(average_coverage * (1.0-delta_coverage));
+                PathArray* pa = NULL;
+                if(min_allowed_coverage > 1 && min_coverage < min_allowed_coverage)
+                {
+                    // split path at min coverage
+                    pa = path_split_at_min_coverages(simple_path, min_allowed_coverage);
+                }
 
-                        // could save the path walking again here if needed, hold these figures in path structure
-                        double average_coverage=0;
-                        double standard_deviation = 0;
-                        int min_coverage=0;
-                        int max_coverage=0;
-                        path_get_statistics(&average_coverage, &min_coverage, &max_coverage, simple_path);
-                        path_get_coverage_standard_deviation(&standard_deviation, average_coverage, simple_path);
-                        // NOTE: decision - minimum cov or average cov dictates confidence threshold met?
-                        // Output for alternative formats
-                        path_to_fasta(simple_path, fp_contigs_fasta);
-                        
-                        if(min_coverage < average_coverage - 2 * standard_deviation)
+                if(pa && pa->number_of_paths > 0)
+                {
+                    for(int i = 0; i < pa->number_of_paths; i++)
+                    {
+                        Path* path = pa->paths[i];
+                        if (path->length > (min_contig_size - graph->kmer_size)) 
                         {
-                            min_coverage = average_coverage - 2 * standard_deviation;
-                        }
-                        
-                        for(i = 0; i < simple_path->length; i++) 
-                        {
-                            //TODO: make COLOUR-safe
-                            simple_path->nodes[i]->coverage[0] -= min_coverage;
-                            if(simple_path->nodes[i]->coverage[0] <= 0)
-                            {
-                                cleaning_prune_db_node(simple_path->nodes[i], graph);
-                                db_node_action_set_flag(simple_path->nodes[i], VISITED);
-                            }
-                        }                            
-                        
-                        counter++;
-                    } else {
-                        log_printf("Didn't write path of size %d\n", simple_path->length);
+                            path_to_fasta(path, fp_contigs_fasta);
+                        } 
                     }
-
-            
-                    /*	HERE - INSTEAD OF 'VISITING' AN X-NODE, REMOVE EDGES FROM BEFORE
-                     AND AFTER IT ON CURRENT PATH */
-                    
-                    //unset VISITED flags from grow_graph_from_node_stats
-                    dBNode* queue_node;
-                    while (graph_queue->number_of_items > 0) {
-                        queue_node = (dBNode*)queue_pop(graph_queue);
-                        db_node_action_unset_flag(queue_node, VISITED);
+                    path_array_destroy(pa);                      
+                }
+                else
+                {
+                    if (simple_path->length > (min_contig_size - graph->kmer_size)) 
+                    {
+                        path_to_fasta_with_statistics(simple_path, fp_contigs_fasta, average_coverage, min_coverage, max_coverage);
+                    } 
+                }
+                
+                int subtractand = min_coverage > min_allowed_coverage ? min_coverage: min_allowed_coverage;
+                for(i = 0; i < simple_path->length; i++) 
+                {
+                    //TODO: make COLOUR-safe
+                    simple_path->nodes[i]->coverage[0] -= subtractand;
+                    if(simple_path->nodes[i]->coverage[0] <= 0)
+                    {
+                        cleaning_prune_db_node(simple_path->nodes[i], graph);
+                        db_node_action_set_flag(simple_path->nodes[i], VISITED);
                     }
+                }   
 
-                    /* Reset paths */
-                    path_reset(simple_path);
-                    path_reset(path_fwd);
-                    path_reset(path_rev);
+                /* Reset paths */
+                path_reset(simple_path);
+                path_reset(path_fwd);
+                path_reset(path_rev);
 
-                } else  {
-                    log_printf("  Number of nodes (%i) too small. Not outputting contig.\n", nodes_in_graph->total_size);
-                } // end size graph size check
-
-
-            } else {
-                // catch graph size of zero? Not sure why this happens - grow-graph must be failing
-                log_printf("graph size of zero?\n");
-            }
-            if (nodes_in_graph->branch_nodes>(MAX_BRANCHES-1)){
-                nodes_in_graph->branch_nodes=MAX_BRANCHES-1;
-            }
+            } 
+            else  
+            {
+                log_printf("  Number of nodes (%i) too small. Not outputting contig.\n", nodes_in_graph->total_size);
+            } // end size graph size check
         }
     } // traversal_for_contigs
 
@@ -434,7 +325,6 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
     log_and_screen_printf("DONE\n");
 
     // first line for stats output file
-    fprintf(fp_analysis, "\n#Subgraph sizes\n");
     log_and_screen_printf("Graph size traversal started...");
     // first travesal - build subgraphs out, produce stats
     hash_table_traverse(&explore_graph_size, graph);
@@ -453,8 +343,7 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
     log_and_screen_printf("Full traversal started...");
     hash_table_traverse(&traversal_for_contigs, graph);
     log_and_screen_printf("DONE\n");
-       
-    fclose(fp_analysis);
-    fclose(fp_degrees);   
+     
     db_graph_reset_flags(graph);
+    fclose(fp_contigs_fasta);
 }

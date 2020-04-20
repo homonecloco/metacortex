@@ -168,8 +168,6 @@ void clear_list(dBGraph* graph)
  * Params:                                                              *
  * Returns:                                                             *
  *----------------------------------------------------------------------*/
-
-
 int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue, GraphInfo* nodes_in_graph, float delta)
 {
     Queue* nodes_to_walk;
