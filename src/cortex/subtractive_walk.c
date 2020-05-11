@@ -61,6 +61,8 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
     int i;
     int counter= 0;
     int min_distance = 0; //10 * (graph->kmer_size);  // NOTE: needs to be a cmd_line option
+    
+    min_contig_size = min_contig_size > graph->kmer_size + 1 ? min_contig_size : graph->kmer_size + 1;
 
     Path *simple_path = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
     Path *path_fwd = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
@@ -267,22 +269,56 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
                 path_get_statistics(&average_coverage, &min_coverage, &max_coverage, simple_path);
 
                 int min_allowed_coverage = (int)(average_coverage * (1.0-delta_coverage));
+                min_allowed_coverage = min_allowed_coverage < graph->path_coverage_minimum ? graph->path_coverage_minimum : min_allowed_coverage;
                 PathArray* pa = NULL;
-                if(min_allowed_coverage > 1 && min_coverage < min_allowed_coverage)
+                if(min_coverage < min_allowed_coverage)
                 {
                     // split path at min coverage
                     pa = path_split_at_min_coverages(simple_path, min_allowed_coverage);
-                }
 
-                if(pa && pa->number_of_paths > 0)
-                {
-                    for(int i = 0; i < pa->number_of_paths; i++)
+                    for(int path_index = 0; path_index < pa->number_of_paths; path_index++)
                     {
-                        Path* path = pa->paths[i];
+                        Path* path = pa->paths[path_index];
+                        double average_subpath_coverage = 0;
+                        int min_subpath_coverage = 0;
+                        int max_subpath_coverage = 0;
+                        path_get_statistics(&average_subpath_coverage, &min_subpath_coverage, &max_subpath_coverage, path);
+
+                        if(min_subpath_coverage < min_allowed_coverage)
+                        {
+                            char* path_id;
+                            if(path->subpath_id == 0)
+                            {
+                                asprintf(&path_id, "node_%qd", path->id);
+                            }
+                            else
+                            {
+                                asprintf(&path_id, "node_%qd.%hi", path->id, path->subpath_id);
+                            }
+                            log_and_screen_printf("[subtractive_walk] Warning: Path with too small coverage: %s,\t min allowed: %i\n", path_id, min_allowed_coverage);
+                            log_and_screen_printf("[subtractive_walk] Average Coverage: %f,\t Min Coverage: %i,\t Max Coverage: %i\n", average_subpath_coverage, min_subpath_coverage, max_subpath_coverage);
+                            log_and_screen_printf("[subtractive_walk] Node: %i,\t path length: %i\n", node, path->length);
+                            
+                        }
+
                         if (path->length > (min_contig_size - graph->kmer_size)) 
                         {
                             path_to_fasta(path, fp_contigs_fasta);
+                        }
+                        
+                        for(int j = 0; j < path->length; j++) 
+                        {
+                            //TODO: make COLOUR-safe
+                            int coverage = element_get_coverage_all_colours(path->nodes[j]);
+                            assert(NUMBER_OF_COLOURS == 1);
+                            element_update_coverage(path->nodes[j], 0, coverage - 1);
+                            if(coverage -1 <= 0)
+                            {
+                                cleaning_prune_db_node(path->nodes[j], graph);
+                                db_node_action_set_flag(path->nodes[j], VISITED);
+                            }
                         } 
+                        
                     }
                     path_array_destroy(pa);                      
                 }
@@ -291,20 +327,22 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
                     if (simple_path->length > (min_contig_size - graph->kmer_size)) 
                     {
                         path_to_fasta_with_statistics(simple_path, fp_contigs_fasta, average_coverage, min_coverage, max_coverage);
-                    } 
-                }
-                
-                int subtractand = min_coverage > min_allowed_coverage ? min_coverage: min_allowed_coverage;
-                for(i = 0; i < simple_path->length; i++) 
-                {
-                    //TODO: make COLOUR-safe
-                    simple_path->nodes[i]->coverage[0] -= subtractand;
-                    if(simple_path->nodes[i]->coverage[0] <= 0)
-                    {
-                        cleaning_prune_db_node(simple_path->nodes[i], graph);
-                        db_node_action_set_flag(simple_path->nodes[i], VISITED);
                     }
-                }   
+                    
+                    for(int j = 0; j < simple_path->length; j++) 
+                    {
+                        //TODO: make COLOUR-safe
+                        int coverage = element_get_coverage_all_colours(simple_path->nodes[j]);
+                        assert(NUMBER_OF_COLOURS == 1);
+                        element_update_coverage(simple_path->nodes[j], 0, coverage - 1);
+                        if(coverage -1 <= 0)
+                        {
+                            cleaning_prune_db_node(simple_path->nodes[j], graph);
+                            db_node_action_set_flag(simple_path->nodes[j], VISITED);
+                        }
+
+                    }   
+                }
 
                 /* Reset paths */
                 path_reset(simple_path);

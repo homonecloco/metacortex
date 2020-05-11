@@ -3557,31 +3557,40 @@ PathArray* path_split_at_min_coverages(Path* path, int min_coverage)
     assert(path_get_length(path) > 0);
     PathArray* pa = path_array_new(2);
     
-    int start = 0;
+    int start = -1;
     short subpath_id = 1;
     for(int i = 0; i < path->length; ++i)
     {
         dBNode* current_node = path->nodes[i];
-        if(current_node->coverage[0] < min_coverage)
+        int current_coverage = element_get_coverage_all_colours(current_node);
+        
+        if(start < 0 && current_coverage >= min_coverage)
         {
-            if(i - start > 0)
+            start = i;
+        }
+        else if(current_coverage < min_coverage)
+        {
+            if(start >= 0)
             {
                 int length = i - start;
-                Path* new_subpath = path_new(length + 1, path->kmer_size);
-                new_subpath->id = path->id;
-                new_subpath->subpath_id = subpath_id++;
-                path_copy_subpath(new_subpath, path, start, i);
-                path_array_add_path(new_subpath, pa);
+                if(length > 1)
+                {
+                    Path* new_subpath = path_new(length, path->kmer_size);
+                    new_subpath->id = path->id;
+                    new_subpath->subpath_id = subpath_id++;
+                    path_copy_subpath(new_subpath, path, start, i);
+                    path_array_add_path(new_subpath, pa);
+                }
             }
-            start = i + 1;                  
+            start = -1;                  
         }
     }
     
     // add the last path
-    if(start != 0 && start < path->length)
+    if(start > 0 && start < path->length)
     {
         int length = path->length - start;
-        Path* new_subpath = path_new(length + 1, path->kmer_size);
+        Path* new_subpath = path_new(length, path->kmer_size);
         new_subpath->id = path->id;
         new_subpath->subpath_id = subpath_id;
         path_copy_subpath(new_subpath, path, start, path->length);
