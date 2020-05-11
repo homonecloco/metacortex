@@ -1396,7 +1396,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     typedef struct
     {
         Nucleotide base;
-        int coverage;
+        uint32_t coverage;
     } base_coverage_pair;
 
     int compare(const void* a, const void* b)
@@ -1407,8 +1407,8 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     }
     
     double avg_coverage;
-    int min_coverage;
-    int max_coverage;
+    uint32_t min_coverage;
+    uint32_t max_coverage;
     path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, main_path);
     
     int max_path_size = main_path->length * 10;

@@ -87,7 +87,7 @@ Nucleotide coverage_walk_get_best_label(dBNode* node, Orientation orientation, d
     void check_edge(Nucleotide nucleotide) {
         if (db_node_edge_exist_any_colour(node, nucleotide, orientation)) {
             pathStep step, reverse_step, next_step;
-            int coverage;
+            uint32_t coverage;
 
             step.node = node;
             step.label = nucleotide;
@@ -199,8 +199,8 @@ Nucleotide coverage_walk_get_best_label_bubble(pathStep * step, dBNode* node, Or
         if (db_node_edge_exist_any_colour(node, nucleotide, orientation)) {
             pathStep current_step, reverse_step, next_step;
             double avg_coverage;
-            int min_coverage;
-            int max_coverage;
+            uint32_t min_coverage;
+            uint32_t max_coverage;
             // TODO: what should this be?
             int MAX_BRANCH_LENGTH=step->path->max_length;//(db_graph->kmer_size)*2;
 

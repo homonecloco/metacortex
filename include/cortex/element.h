@@ -109,9 +109,9 @@ void element_initialise(Element *, BinaryKmer* kmer, short kmer_size);
 BinaryKmer* element_get_kmer(Element *);
 
 //int element_get_coverage(Element *);
-int element_get_coverage_all_colours(Element *);
+uint32_t element_get_coverage_all_colours(Element *);
 
-int element_get_coverage_by_colour(Element *, short);
+uint32_t element_get_coverage_by_colour(Element *, short);
 
 int element_update_coverage(Element *, short, int);
 

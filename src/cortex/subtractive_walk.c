@@ -104,7 +104,7 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
     // Hash table iterator to label nodes
     void stats_traversal(dBNode * node) {
         //if (!db_node_check_flag_visited(node)) {
-        int this_coverage = element_get_coverage_all_colours(node) - 1;
+        uint32_t this_coverage = element_get_coverage_all_colours(node) - 1;
         int edges_forward= db_node_edges_count_all_colours(node, forward);
         int edges_reverse = db_node_edges_count_all_colours(node, reverse);
         int all_edges = edges_forward + edges_reverse;
@@ -264,11 +264,11 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
                 log_printf("graph size\t%i\n",nodes_in_graph->total_size);
 
                 double average_coverage = 0;
-                int min_coverage = 0;
-                int max_coverage = 0;
+                uint32_t min_coverage = 0;
+                uint32_t max_coverage = 0;
                 path_get_statistics(&average_coverage, &min_coverage, &max_coverage, simple_path);
 
-                int min_allowed_coverage = (int)(average_coverage * (1.0-delta_coverage));
+                uint32_t min_allowed_coverage = (uint32_t)(average_coverage * (1.0-delta_coverage));
                 min_allowed_coverage = min_allowed_coverage < graph->path_coverage_minimum ? graph->path_coverage_minimum : min_allowed_coverage;
                 PathArray* pa = NULL;
                 if(min_coverage < min_allowed_coverage)
@@ -280,40 +280,40 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
                     {
                         Path* path = pa->paths[path_index];
                         double average_subpath_coverage = 0;
-                        int min_subpath_coverage = 0;
-                        int max_subpath_coverage = 0;
+                        uint32_t min_subpath_coverage = 0;
+                        uint32_t max_subpath_coverage = 0;
                         path_get_statistics(&average_subpath_coverage, &min_subpath_coverage, &max_subpath_coverage, path);
-
-                        if(min_subpath_coverage < min_allowed_coverage)
-                        {
-                            char* path_id;
-                            if(path->subpath_id == 0)
-                            {
-                                asprintf(&path_id, "node_%qd", path->id);
-                            }
-                            else
-                            {
-                                asprintf(&path_id, "node_%qd.%hi", path->id, path->subpath_id);
-                            }
-                            log_and_screen_printf("[subtractive_walk] Warning: Path with too small coverage: %s,\t min allowed: %i\n", path_id, min_allowed_coverage);
-                            log_and_screen_printf("[subtractive_walk] Average Coverage: %f,\t Min Coverage: %i,\t Max Coverage: %i\n", average_subpath_coverage, min_subpath_coverage, max_subpath_coverage);
-                            log_and_screen_printf("[subtractive_walk] Node: %i,\t path length: %i\n", node, path->length);
-                            
-                        }
 
                         if (path->length > (min_contig_size - graph->kmer_size)) 
                         {
+                            if(min_subpath_coverage < min_allowed_coverage)
+                            {
+                                char* path_id;
+                                if(path->subpath_id == 0)
+                                {
+                                    asprintf(&path_id, "node_%qd", path->id);
+                                }
+                                else
+                                {
+                                    asprintf(&path_id, "node_%qd.%hi", path->id, path->subpath_id);
+                                }
+                                log_and_screen_printf("[subtractive_walk] Warning: Path with too small coverage: %s,\t min allowed: %i\n", path_id, min_allowed_coverage);
+                                log_and_screen_printf("[subtractive_walk] Average Coverage: %f,\t Min Coverage: %u,\t Max Coverage: %u\n", average_subpath_coverage, min_subpath_coverage, max_subpath_coverage);
+                                log_and_screen_printf("[subtractive_walk] Node: %i,\t path length: %i\n", node, path->length);
+                            }
+                                                    
                             path_to_fasta(path, fp_contigs_fasta);
                         }
                         
                         for(int j = 0; j < path->length; j++) 
                         {
                             //TODO: make COLOUR-safe
-                            int coverage = element_get_coverage_all_colours(path->nodes[j]);
+                            uint32_t coverage = element_get_coverage_all_colours(path->nodes[j]);
                             assert(NUMBER_OF_COLOURS == 1);
-                            element_update_coverage(path->nodes[j], 0, coverage - 1);
-                            if(coverage -1 <= 0)
+                            element_update_coverage(path->nodes[j], 0, coverage - min_allowed_coverage);
+                            if(coverage < min_allowed_coverage)
                             {
+                                element_update_coverage(path->nodes[j], 0, 0);
                                 cleaning_prune_db_node(path->nodes[j], graph);
                                 db_node_action_set_flag(path->nodes[j], VISITED);
                             }
@@ -332,11 +332,12 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
                     for(int j = 0; j < simple_path->length; j++) 
                     {
                         //TODO: make COLOUR-safe
-                        int coverage = element_get_coverage_all_colours(simple_path->nodes[j]);
+                        uint32_t coverage = element_get_coverage_all_colours(simple_path->nodes[j]);
                         assert(NUMBER_OF_COLOURS == 1);
-                        element_update_coverage(simple_path->nodes[j], 0, coverage - 1);
-                        if(coverage -1 <= 0)
+                        element_update_coverage(simple_path->nodes[j], 0, coverage - min_allowed_coverage);
+                        if(coverage < min_allowed_coverage)
                         {
+                            element_update_coverage(simple_path->nodes[j], 0, 0);
                             cleaning_prune_db_node(simple_path->nodes[j], graph);
                             db_node_action_set_flag(simple_path->nodes[j], VISITED);
                         }

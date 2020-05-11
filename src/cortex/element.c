@@ -119,18 +119,18 @@ BinaryKmer *element_get_kmer(Element * e)
 //      return e->coverage;
 //}
 
-int element_get_coverage_all_colours(Element * e)
+uint32_t element_get_coverage_all_colours(Element * e)
 {
-    int coverage = 0;
+    uint32_t coverage = 0;
     
-    int c;
-    for (c = 0; c < NUMBER_OF_COLOURS; c++) {
+    for (int c = 0; c < NUMBER_OF_COLOURS; c++) {
         coverage = coverage + e->coverage[c];
     }
+    assert(coverage >= 0);
     return coverage;
 }
 
-int element_get_coverage_by_colour(Element * e, short colour)
+uint32_t element_get_coverage_by_colour(Element * e, short colour)
 {
     if ((colour >= 0) && (colour < NUMBER_OF_COLOURS))
         return e->coverage[colour];

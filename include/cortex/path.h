@@ -228,7 +228,7 @@ void path_increase_id(Path * path);
 
 void path_to_fasta(Path * path, FILE * fout);
 
-void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage, int min_coverage, int max_coverage);
+void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage, uint32_t min_coverage, uint32_t max_coverage);
 
 void path_to_fastg_gfa(Path * path, FILE * fout, FILE * fout2, HashTable* graph);
 
@@ -236,7 +236,7 @@ void path_to_fasta_debug(Path * path, FILE * fout);
 
 void path_to_fasta_colour(Path * path, FILE * fout, char * id);
 
-void path_get_statistics(double * avg_coverage, int * min_coverage, int * max_coverage, Path * path);
+void path_get_statistics(double * avg_coverage, uint32_t * min_coverage, uint32_t * max_coverage, Path * path);
 
 int path_get_nodes_count(Path * path);
 
@@ -319,9 +319,9 @@ void path_inner_iterator(void (*step_action) (pathStep * step), Path * path);
 
 int path_step_compare(pathStep * a, pathStep * b);
 
-void path_get_statistics_between_points(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path, int start, int end);
+void path_get_statistics_between_points(double *avg_coverage, uint32_t *min_coverage, uint32_t *max_coverage, Path * path, int start, int end);
 
-void path_get_statistics(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path);
+void path_get_statistics(double *avg_coverage, uint32_t *min_coverage, uint32_t *max_coverage, Path * path);
 
 void path_get_coverage_standard_deviation(double* standard_deviation, double avg_coverage, Path* path);
 

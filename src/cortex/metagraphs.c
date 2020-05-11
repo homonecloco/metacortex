@@ -115,7 +115,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
                 for (i=0; i<new_path->length; i++) {
                     //  MARTIN : new_path established where?
                     if (!db_node_check_flag_visited(new_path->nodes[i])) {
-                        int this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
+                        uint32_t this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
                         int this_edges = db_node_edges_count_all_colours(new_path->nodes[i], forward) + db_node_edges_count_all_colours(new_path->nodes[i], reverse);
 
                         if ((best_node == 0) ||

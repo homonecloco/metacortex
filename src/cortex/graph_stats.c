@@ -222,10 +222,10 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
                 db_graph_get_perfect_path_with_first_edge_all_colours(&first_step, &db_node_action_do_nothing, new_path, graph);
 
                 // check for path coverage here
-                int starting_coverage = element_get_coverage_all_colours(node);
+                uint32_t starting_coverage = element_get_coverage_all_colours(node);
 
                 double path_coverage=0;
-                int min_coverage=0; int max_coverage=0; // required for path_get_statistics()
+                uint32_t min_coverage=0; uint32_t max_coverage=0; // required for path_get_statistics()
                	path_get_statistics(&path_coverage, &min_coverage, &max_coverage, new_path);
 
                 delta_coverage = delta * (float) starting_coverage;
@@ -274,7 +274,7 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
                     // Now go through all nodes, look for best and mark all as visited
                     for (i=0; i<new_path->length; i++) {
                         if (!db_node_check_flag_visited(new_path->nodes[i])) {
-                            int this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
+                            uint32_t this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
                             int this_FOR_edges = db_node_edges_count_all_colours(new_path->nodes[i], forward);
                             int this_REV_edges = db_node_edges_count_all_colours(new_path->nodes[i], reverse);
 
@@ -513,7 +513,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
     // Hash table iterator to label nodes
     void stats_traversal(dBNode * node) {
         //if (!db_node_check_flag_visited(node)) {
-        int this_coverage = element_get_coverage_all_colours(node) - 1;
+        uint32_t this_coverage = element_get_coverage_all_colours(node) - 1;
         int edges_forward= db_node_edges_count_all_colours(node, forward);
         int edges_reverse = db_node_edges_count_all_colours(node, reverse);
         int all_edges = edges_forward + edges_reverse;
@@ -701,8 +701,8 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
 
                         // could save the path walking again here if needed, hold these figures in path structure
                         double average_coverage=0;
-                        int min_coverage=0;
-                        int max_coverage=0;
+                        uint32_t min_coverage=0;
+                        uint32_t max_coverage=0;
                         path_get_statistics(&average_coverage, &min_coverage, &max_coverage, simple_path);
                         // NOTE: decision - minimum cov or average cov dictates confidence threshold met?
                         // Output for alternative formats
@@ -950,7 +950,7 @@ int explore_subgraphs(dBNode* start_node, dBGraph* graph, GraphInfo* nodes_in_gr
                 db_graph_get_perfect_path_with_first_edge_all_colours(&first_step, &db_node_action_do_nothing, new_path, graph);
 
                 double path_coverage=0;
-                int min_coverage=0; int max_coverage=0; // required for path_get_statistics()
+                uint32_t min_coverage=0; uint32_t max_coverage=0; // required for path_get_statistics()
                 path_get_statistics(&path_coverage, &min_coverage, &max_coverage, new_path);
 
                 if (1)  {
@@ -968,7 +968,7 @@ int explore_subgraphs(dBNode* start_node, dBGraph* graph, GraphInfo* nodes_in_gr
                     // Now go through all nodes, look for best and mark all as visited
                     for (i=0; i<new_path->length; i++) {
                         if (!db_node_check_flag_visited(new_path->nodes[i])) {
-                            int this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
+                            uint32_t this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
                             int this_FOR_edges = db_node_edges_count_all_colours(new_path->nodes[i], forward);
                             int this_REV_edges = db_node_edges_count_all_colours(new_path->nodes[i], reverse);
 

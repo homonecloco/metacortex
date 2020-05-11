@@ -755,8 +755,8 @@ void path_to_fasta_debug(Path * path, FILE * fout)
 
     // Get coverage statistics from path
     double avg_coverage;
-    int min_coverage;
-    int max_coverage;
+    uint32_t min_coverage;
+    uint32_t max_coverage;
     path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, path);
 
     // Get orientation of first and last node
@@ -1111,8 +1111,8 @@ boolean output_polymorphism(Path* path, int* path_pos, dBGraph* graph, FILE* fil
 
                 // is this the highest coverage path?
                 double avg_coverage=0;
-                int min_coverage=0;
-                int max_coverage=0;
+                uint32_t min_coverage=0;
+                uint32_t max_coverage=0;
                 path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, paths[j]);
                 if(avg_coverage>=best_path_cov){
                   if(strlen(tempseq)>best_path_length){
@@ -1305,8 +1305,8 @@ void path_to_fastg_gfa(Path * path, FILE * file_fastg, FILE * file_gfa, HashTabl
 
     // Get coverage statistics from path
     double avg_coverage;
-    int min_coverage;
-    int max_coverage;
+    uint32_t min_coverage;
+    uint32_t max_coverage;
     path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, path);
 
 
@@ -1461,7 +1461,7 @@ void path_to_fastg_gfa(Path * path, FILE * file_fastg, FILE * file_gfa, HashTabl
     destroy_gfa_stats(gfa_count);
 }
 
-void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage, int min_coverage, int max_coverage)
+void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage, uint32_t min_coverage, uint32_t max_coverage)
 {
     short kmer_size = path->kmer_size;
     int length = path->length;
@@ -1606,8 +1606,8 @@ void path_to_fasta(Path * path, FILE * fout)
 {
     // Get coverage statistics from path
     double avg_coverage;
-    int min_coverage;
-    int max_coverage;
+    uint32_t min_coverage;
+    uint32_t max_coverage;
     path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, path);
     path_to_fasta_with_statistics(path, fout, avg_coverage, min_coverage, max_coverage);
 }
@@ -1637,8 +1637,8 @@ void path_to_fasta_colour(Path * path, FILE * fout, char *id)
 
     // Get coverage statistics from path
     double avg_coverage;
-    int min_coverage;
-    int max_coverage;
+    uint32_t min_coverage;
+    uint32_t max_coverage;
     path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, path);
 
     // Get orientation of first and last node
@@ -1861,7 +1861,7 @@ void path_iterator_with_args(void (*step_action) (pathStep * , void *),void * ar
 boolean path_is_singleton(int length, Path * path){
     boolean sing = false;
     double avg_cov;
-    int min_cov, max_cov;
+    uint32_t min_cov, max_cov;
     pathStep first;
     pathStep last;
     path_step_initialise(&first);
@@ -1892,8 +1892,8 @@ boolean path_is_singleton(int length, Path * path){
 boolean path_is_repetitive(double graph_cov, Path * p)
 {
     double avg_cov = 0;
-    int min_cov = 0;
-    int max_cov = 0;
+    uint32_t min_cov = 0;
+    uint32_t max_cov = 0;
     boolean rep= false;
     if(path_has_stop_reason(FIRST, PATH_FLAG_DIVERGING_PATHS, p) &&path_has_stop_reason(LAST, PATH_FLAG_DIVERGING_PATHS, p) ){
         if(path_get_length(p)  < p->kmer_size * 2){
@@ -2095,7 +2095,7 @@ void path_print_contig_with_details(FILE * fout, Path * p){
 
 }
 
-void path_get_statistics_between_points(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path, int start, int end)
+void path_get_statistics_between_points(double *avg_coverage, uint32_t *min_coverage, uint32_t *max_coverage, Path * path, int start, int end)
 {
     /**
     * TODO: validate if the path is empty... think about singletons....
@@ -2114,7 +2114,7 @@ void path_get_statistics_between_points(double *avg_coverage, int *min_coverage,
 
     for (; i < end; i++) {	//Calculate the return values for the current path.
 
-      int coverage = element_get_coverage_all_colours(path->nodes[i]);
+      uint32_t coverage = element_get_coverage_all_colours(path->nodes[i]);
       sum_coverage += coverage;
       *max_coverage = (*max_coverage < coverage) ? coverage : *max_coverage;
       *min_coverage = (*min_coverage > coverage) ? coverage : *min_coverage;
@@ -2127,7 +2127,7 @@ void path_get_statistics_between_points(double *avg_coverage, int *min_coverage,
       *min_coverage = 0;
     }  
 }
-void path_get_statistics(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path)
+void path_get_statistics(double *avg_coverage, uint32_t *min_coverage, uint32_t *max_coverage, Path * path)
 {
     path_get_statistics_between_points(avg_coverage, min_coverage, max_coverage, path, 0, path->length);
 }
@@ -2146,7 +2146,7 @@ void path_get_coverage_standard_deviation(double* standard_deviation, double avg
 
     for (; i < path->length; i++) 
     {
-      int coverage = element_get_coverage_all_colours(path->nodes[i]);
+      uint32_t coverage = element_get_coverage_all_colours(path->nodes[i]);
       double diff = (avg_coverage - coverage) * (avg_coverage - coverage);
       sum_deviations += diff;
     }
@@ -3012,8 +3012,8 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
     short kmer_size = path->kmer_size;
     int length = path->length;
     double avg_coverage;
-    int min_coverage;
-    int max_coverage;
+    uint32_t min_coverage;
+    uint32_t max_coverage;
     path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, path);
 
     // Get orientation of first and last node
@@ -3258,8 +3258,8 @@ out_struct write_paths_between_nodes(  Path* path,
     // construct the segment from start_pos up to current_pos
     int sequence_length = current_pos - start_pos;
     
-    int path_coverage_max = path->nodes[start_pos]->coverage[0];
-    int path_coverage_min = path->nodes[start_pos]->coverage[0];
+    uint32_t path_coverage_max = path->nodes[start_pos]->coverage[0];
+    uint32_t path_coverage_min = path->nodes[start_pos]->coverage[0];
     double path_coverage_avg = (double)path->nodes[start_pos]->coverage[0];
     
     if(fastg_recursion_level == 1)
@@ -3562,7 +3562,7 @@ PathArray* path_split_at_min_coverages(Path* path, int min_coverage)
     for(int i = 0; i < path->length; ++i)
     {
         dBNode* current_node = path->nodes[i];
-        int current_coverage = element_get_coverage_all_colours(current_node);
+        uint32_t current_coverage = element_get_coverage_all_colours(current_node);
         
         if(start < 0 && current_coverage >= min_coverage)
         {
