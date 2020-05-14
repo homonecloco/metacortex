@@ -1296,9 +1296,11 @@ void path_to_fastg_gfa(Path * path, FILE * file_fastg, FILE * file_gfa, HashTabl
         printf("[path_to_fasta] About to print a path\n");
     }
 
+/*
     if (length == max_length) {
         log_and_screen_printf("contig length equals max length [%i] for node_%i\n", max_length, path->id);
     }
+*/
 
     // Set value of PRINT_FIRST (whether first node included)
     //check_print_first(path);
@@ -1482,9 +1484,11 @@ void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage
         printf("[path_to_fasta] About to print a path\n");
     }
 
+/*
     if (length == max_length) {
         log_and_screen_printf("contig length equals max length [%i] for node_%i\n", max_length, path->id);
     }
+*/
 
     // Get orientation of first and last node
     Orientation fst_orientation;
@@ -1560,7 +1564,7 @@ void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage
 
     // Output to file
     fprintf(fout,
-            ">%s length:%i average_coverage:%.2f min_coverage:%i max_coverage:%i fst_coverage:%i fst_r:%s fst_f:%s lst_coverage:%i lst_r:%s lst_f:%s\n",
+            ">%s length:%i average_coverage:%.2f min_coverage:%u max_coverage:%u fst_coverage:%u fst_r:%s fst_f:%s lst_coverage:%u lst_r:%s lst_f:%s\n",
             path_id,
             (flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? length + kmer_size : length + kmer_size - 1), avg_coverage,
             min_coverage,
@@ -1708,7 +1712,7 @@ void path_to_fasta_colour(Path * path, FILE * fout, char *id)
 
     // Output to file
     fprintf(fout,
-            ">%s length:%i %s average_coverage:%.2f min_coverage:%i max_coverage:%i fst_coverage:%i fst_r:%s fst_f:%s lst_coverage:%i lst_r:%s lst_f:%s\n",
+            ">%s length:%i %s average_coverage:%.2f min_coverage:%u max_coverage:%u fst_coverage:%u fst_r:%s fst_f:%s lst_coverage:%u lst_r:%s lst_f:%s\n",
             id,
             (flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? ((int)strlen(path->seq) + kmer_size) : ((int)strlen(path->seq) + kmer_size - 1)),
             path->header,
@@ -1749,11 +1753,11 @@ void path_to_coverage(Path * path, FILE * fout)
     fprintf(fout, ">node_%qd \n", path->id);
 
     for (; i < path->kmer_size - 1; i++) {
-        fprintf(fout, "%i ", element_get_coverage_all_colours(path->nodes[flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 : 1]));
+        fprintf(fout, "%u ", element_get_coverage_all_colours(path->nodes[flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 : 1]));
     }
 
     for (i = 0; i < path->length; i++) {
-        fprintf(fout, "%i ", element_get_coverage_all_colours(path->nodes[i]));
+        fprintf(fout, "%u ", element_get_coverage_all_colours(path->nodes[i]));
     }
 
     fprintf(fout, "\n");
@@ -1784,13 +1788,13 @@ void path_to_coverage_colour(Path * path, FILE * fout, char *id, short colour)
     }
     // Write first kmer coverage
     for (; i < kmer_size - 1; i++) {
-        fprintf(fout, "%i ", element_get_coverage_by_colour(path->nodes[flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 :	1], colour));
+        fprintf(fout, "%u ", element_get_coverage_by_colour(path->nodes[flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 :	1], colour));
     }
 
     // Write path coverage
     i = flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 : 1;
     for (; i < path->length; i++) {
-        fprintf(fout, "%i ", element_get_coverage_by_colour(path->nodes[i], colour));
+        fprintf(fout, "%u ", element_get_coverage_by_colour(path->nodes[i], colour));
     }
 
     fprintf(fout, "\n");
@@ -2109,8 +2113,8 @@ void path_get_statistics_between_points(double *avg_coverage, uint32_t *min_cove
         i = flags_check_for_flag(PRINT_FIRST, &(path->flags)) ? 0 : 1;
     }
     *max_coverage = 0;
-    *min_coverage = INT_MAX;
-    int sum_coverage = 0;
+    *min_coverage = UINT_MAX;
+    uint32_t sum_coverage = 0;
 
     for (; i < end; i++) {	//Calculate the return values for the current path.
 
@@ -2123,7 +2127,7 @@ void path_get_statistics_between_points(double *avg_coverage, uint32_t *min_cove
     int length = end-start;
     *avg_coverage = (double)sum_coverage / length;
 
-    if (*min_coverage == INT_MAX) {
+    if (*min_coverage == UINT_MAX) {
       *min_coverage = 0;
     }  
 }

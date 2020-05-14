@@ -140,7 +140,7 @@ uint32_t element_get_coverage_by_colour(Element * e, short colour)
     }
 }
 
-int element_update_coverage(Element * e, short colour, int update)
+uint32_t element_update_coverage(Element * e, short colour, int update)
 {
     if ((colour >= 0) && (colour < NUMBER_OF_COLOURS)) {
         //printf("[element_update_coverage] Update element %x colour %d by %d Total %d\n", e, colour, update, element_get_coverage_all_colours(e));
