@@ -688,8 +688,8 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                     // should be a perfect path? might be two paths though, if we started in the middle
                     // NOTE: unecessary coverage element but repeating the whole path finding without coverage
                     //  is more work than necessary I think. See what processing time it changes?
-                    coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd);
-                    coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev);
+                    coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd, true);
+                    coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev, true);
 
                     path_reverse(path_fwd, simple_path);
                     path_append(simple_path, path_rev);

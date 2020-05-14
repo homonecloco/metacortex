@@ -285,8 +285,8 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
                     int pi;
 
                     binary_kmer_to_seq(&(seed_node->kmer), graph->kmer_size, seq);
-                    coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd);
-                    coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev);
+                    coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd, true);
+                    coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev, true);
                     path_reverse(path_fwd, final_path);
                     path_append(final_path, path_rev);
                     final_path->id = counter;

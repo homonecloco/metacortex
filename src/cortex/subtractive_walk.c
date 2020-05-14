@@ -233,7 +233,8 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
     // Hash table iterator to walk graphs, produce paths
     void traversal_for_contigs(dBNode * node) 
     {
-        if(db_node_check_for_any_flag(node, PRUNED | VISITED) == false)
+        if( db_node_check_for_any_flag(node, PRUNED | VISITED) == false && 
+            element_get_coverage_all_colours(node) >= graph->path_coverage_minimum)
         {
             dBNode* seed_node = node;
             initialise_GraphInfo(nodes_in_graph);
@@ -252,8 +253,8 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
                 // should be a perfect path? might be two paths though, if we started in the middle
                 // NOTE: unecessary coverage element but repeating the whole path finding without coverage
                 //  is more work than necessary I think. See what processing time it changes?
-                coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd);
-                coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev);
+                coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd, false);
+                coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev, false);
 
                 path_reverse(path_fwd, simple_path);
                 path_append(simple_path, path_rev);
@@ -304,21 +305,26 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
                                                     
                             path_to_fasta(path, fp_contigs_fasta);
                         }
-                        
+                    }
+                    
+                    for(int path_index = 0; path_index < pa->number_of_paths; path_index++)
+                    {
+                        Path* path = pa->paths[path_index];
                         for(int j = 0; j < path->length; j++) 
                         {
                             //TODO: make COLOUR-safe
-                            uint32_t coverage = element_get_coverage_all_colours(path->nodes[j]);
+                            dBNode* node = path->nodes[j];
+                            uint32_t coverage = element_get_coverage_all_colours(node);
                             assert(NUMBER_OF_COLOURS == 1);
-                            element_update_coverage(path->nodes[j], 0, coverage - min_allowed_coverage);
+                            node->coverage[0] = coverage - min_allowed_coverage;
+                                                                     
                             if(coverage < min_allowed_coverage)
                             {
-                                element_update_coverage(path->nodes[j], 0, 0);
+                                node->coverage[0] = 0;
                                 cleaning_prune_db_node(path->nodes[j], graph);
                                 db_node_action_set_flag(path->nodes[j], VISITED);
                             }
-                        } 
-                        
+                        }                      
                     }
                     path_array_destroy(pa);                      
                 }
@@ -332,12 +338,13 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename,
                     for(int j = 0; j < simple_path->length; j++) 
                     {
                         //TODO: make COLOUR-safe
-                        uint32_t coverage = element_get_coverage_all_colours(simple_path->nodes[j]);
+                        dBNode* node = simple_path->nodes[j];
+                        uint32_t coverage = element_get_coverage_all_colours(node);
                         assert(NUMBER_OF_COLOURS == 1);
-                        element_update_coverage(simple_path->nodes[j], 0, coverage - min_allowed_coverage);
+                        node->coverage[0] = coverage - min_allowed_coverage;
                         if(coverage < min_allowed_coverage)
                         {
-                            element_update_coverage(simple_path->nodes[j], 0, 0);
+                            node->coverage[0] = 0;
                             cleaning_prune_db_node(simple_path->nodes[j], graph);
                             db_node_action_set_flag(simple_path->nodes[j], VISITED);
                         }

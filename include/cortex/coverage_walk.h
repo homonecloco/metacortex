@@ -29,6 +29,6 @@
 #ifndef COVERAGE_WALK_H
 #define COVERAGE_WALK_H
 
-int coverage_walk_get_path(dBNode * node, Orientation orientation, void (*node_action) (dBNode * node), dBGraph * db_graph, Path * path);
+int coverage_walk_get_path(dBNode * node, Orientation orientation, void (*node_action) (dBNode * node), dBGraph * db_graph, Path * path, boolean check_bubbles);
 
 #endif //COVERAGE_WALK_H

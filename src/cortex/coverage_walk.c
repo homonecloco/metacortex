@@ -260,6 +260,18 @@ Nucleotide coverage_walk_get_best_label_bubble(pathStep * step, dBNode* node, Or
  *----------------------------------------------------------------------*/
 pathStep* coverage_walk_get_first_label(pathStep * first_step, dBGraph * db_graph)
 {
+    first_step->label = coverage_walk_get_best_label(first_step->node, first_step->orientation, db_graph);
+    return first_step;
+}
+
+/*----------------------------------------------------------------------*
+ * Function:                                                            *
+ * Purpose:                                                             *
+ * Params:                                                              *
+ * Returns:                                                             *
+ *----------------------------------------------------------------------*/
+pathStep* coverage_walk_get_first_label_bubble(pathStep * first_step, dBGraph * db_graph)
+{
     first_step->label = Undefined;
 
     if (db_node_edges_count_all_colours(first_step->node, first_step->orientation)==1){ // for simple, non-branching nodes
@@ -277,6 +289,26 @@ pathStep* coverage_walk_get_first_label(pathStep * first_step, dBGraph * db_grap
  * Returns:                                                             *
  *----------------------------------------------------------------------*/
 static pathStep *coverage_walk_get_next_step(pathStep * current_step, pathStep * next_step, pathStep * reverse_step, dBGraph * db_graph)
+{
+    db_graph_get_next_step(current_step, next_step, reverse_step, db_graph);
+    assert(next_step != NULL);
+    next_step->label = Undefined;
+
+    if (next_step->node != NULL) 
+    {
+        next_step->label = coverage_walk_get_best_label(next_step->node, next_step->orientation, db_graph);
+    }
+
+    return next_step;
+}
+
+/*----------------------------------------------------------------------*
+ * Function:                                                            *
+ * Purpose:                                                             *
+ * Params:                                                              *
+ * Returns:                                                             *
+ *----------------------------------------------------------------------*/
+static pathStep *coverage_walk_get_next_step_bubble(pathStep * current_step, pathStep * next_step, pathStep * reverse_step, dBGraph * db_graph)
 {
     db_graph_get_next_step(current_step, next_step, reverse_step, db_graph);
     assert(next_step != NULL);
@@ -377,7 +409,8 @@ WalkingFunctions * coverage_walk_get_funtions(WalkingFunctions *walking_function
 int coverage_walk_get_path_with_callback(dBNode * node, Orientation orientation,
                                          void (*node_action) (dBNode * node),
                                          void (*path_action) (Path * path),
-                                         dBGraph * db_graph)
+                                         dBGraph * db_graph,
+                                         boolean check_bubbles)
 {
     // Get walking functions
     WalkingFunctions wf;
@@ -389,7 +422,16 @@ int coverage_walk_get_path_with_callback(dBNode * node, Orientation orientation,
     first.orientation = orientation;
     first.label = Undefined;
     first.flags = 0;
-    wf.get_starting_step = &coverage_walk_get_first_label;
+    if(check_bubbles)
+    {
+        wf.get_next_step = &coverage_walk_get_next_step_bubble;
+        wf.get_starting_step = &coverage_walk_get_first_label_bubble;
+    }
+    else
+    {
+        wf.get_next_step = &coverage_walk_get_next_step;
+        wf.get_starting_step = &coverage_walk_get_first_label;       
+    }
 
     // Setup step action to include passed in node action
     //void (*action) (pathStep * step);
@@ -434,13 +476,13 @@ int coverage_walk_get_path_with_callback(dBNode * node, Orientation orientation,
  * Params:                                                              *
  * Returns:                                                             *
  *----------------------------------------------------------------------*/
-int coverage_walk_get_path(dBNode * node, Orientation orientation, void (*node_action) (dBNode * node), dBGraph * db_graph, Path * path)
+int coverage_walk_get_path(dBNode * node, Orientation orientation, void (*node_action) (dBNode * node), dBGraph * db_graph, Path * path, boolean check_bubbles)
 {
     void copy_path(Path * p) {
         path_copy(path, p);
     }
 
-    coverage_walk_get_path_with_callback(node, orientation,	node_action, &copy_path, db_graph);
+    coverage_walk_get_path_with_callback(node, orientation, node_action, &copy_path, db_graph, check_bubbles);
 
     return path_get_edges_count(path);
 }
