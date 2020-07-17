@@ -36,7 +36,6 @@
 #include "logger.h"
 #include "graph_tools.h"
 #include "graph_formats.h"
-#include "node_queue.h"
 #include "coverage_walk.h"
 #include "perfect_path.h"
 #include "metagraphs.h"
@@ -49,7 +48,7 @@
  * Params:                                                              *
  * Returns:                                                             *
  *----------------------------------------------------------------------*/
-int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue)
+int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue, int max_search_size)
 {
     Queue* nodes_to_walk;
     dBNode* node;
@@ -59,7 +58,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
     int best_coverage = 0;
     int best_edges = 0;
 
-    *best_node = 0;
+    *best_node = 0;  
 
     // Nucleotide iterator, used to walk all possible paths from a node
     void walk_if_exists(Nucleotide n) {
@@ -159,7 +158,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
     }
 
     // Now keep visiting nodes and walking paths
-    while (nodes_to_walk->number_of_items > 0) {
+    while (nodes_to_walk->number_of_items > 0 && nodes_to_walk->number_of_items < max_search_size) {
         // Take top node from list
         node = queue_pop_node(nodes_to_walk, &depth);
 
@@ -267,7 +266,7 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
             /* Grow graph from this node, returning the 'best' (highest coverage) node to store as seed point */
             log_printf("Growing graph from node\n");
             graph_queue->number_of_items = 0;
-            nodes_in_graph = grow_graph_from_node(node, &seed_node, graph, graph_queue);
+            nodes_in_graph = grow_graph_from_node(node, &seed_node, graph, graph_queue, 1000);
             total_nodes += nodes_in_graph;
 
             if (seed_node == NULL) {
@@ -293,7 +292,6 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
                     if (final_path->length >= (min_contig_length - graph->kmer_size)) {
                         log_printf("Write path of size %d\n", final_path->length);
                         log_printf("graph size\t%i\n",nodes_in_graph);
-                        //path_to_fastg_gfa(final_path, fp_contigs, NULL, graph);
                         path_to_fasta(final_path, fp_contigs);
                         if(gfa_fastg_output)
                         {

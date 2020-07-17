@@ -32,6 +32,8 @@
 #define MAX_EXPLORE_PATH_LENGTH 2000000
 #define MAX_EXPLORE_NODES 200
 
+#include "node_queue.h"
+
 typedef struct {
     dBNode* seed_node;
     int graph_size;
@@ -50,5 +52,7 @@ typedef struct {
 
 void metacortex_find_subgraphs( dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, 
                                 boolean multiple_subgraph_contigs, boolean gfa_fastg_output);
+
+int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue, int max_search_size);
 
 #endif // METAGRAPHS_H

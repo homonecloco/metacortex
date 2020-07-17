@@ -509,11 +509,7 @@ int main(int argc, char **argv)
                  // pass path_coverage_minimum value to dBgraph for use later
                 db_graph->path_coverage_minimum = cmd_line.path_coverage_minimum;
                 log_and_screen_printf("\nPerforming iterative subtractive walk..\n");       
-                subtractive_walk(db_graph, cmd_line.output_fasta_filename,
-                    cmd_line.min_subgraph_size, cmd_line.min_contig_length,
-                    cmd_line.max_node_edges, cmd_line.delta_coverage,
-                    cmd_line.linked_list_max_size,
-                    cmd_line.multiple_subgraph_contigs);
+                subtractive_walk(db_graph, cmd_line.output_fasta_filename, cmd_line.min_contig_length, cmd_line.delta_coverage);
                 break;
                 
             default:
@@ -536,7 +532,7 @@ int main(int argc, char **argv)
 void print_graph(dBGraph * db_graph)
 {
 	void print_graphviz(dBNode * node) {
-		if (node != NULL) {
+		if (node != NULL && element_get_coverage_all_colours(node) > 0) {
 			BinaryKmer tmp, co;
 
 			short kmer_size = db_graph->kmer_size;

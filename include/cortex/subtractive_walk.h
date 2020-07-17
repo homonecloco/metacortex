@@ -29,10 +29,7 @@
 #define SUBTRACTIVE_WALK_H
 
 
-void subtractive_walk(   dBGraph* graph, char* consensus_contigs_filename, 
-                            int min_subgraph_kmers, int min_contig_size, 
-                            int max_node_edges, float delta_coverage, 
-                            int linked_list_max_size, int walk_paths);
+void subtractive_walk(dBGraph* graph, char* consensus_contigs_filename, int min_contig_size, float delta_coverage);
 
 
 #endif /* SUBTRACTIVE_WALK_H */

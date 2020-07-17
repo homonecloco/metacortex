@@ -83,6 +83,8 @@ Nucleotide coverage_walk_get_best_label(dBNode* node, Orientation orientation, d
 {
     Nucleotide label = Undefined;
     int highest_coverage = 0;
+    
+    uint32_t this_coverage = element_get_coverage_all_colours(node);
 
     void check_edge(Nucleotide nucleotide) {
         if (db_node_edge_exist_any_colour(node, nucleotide, orientation)) {
@@ -93,7 +95,7 @@ Nucleotide coverage_walk_get_best_label(dBNode* node, Orientation orientation, d
             step.label = nucleotide;
             step.orientation = orientation;
             step.flags = 0;
-            db_graph_get_next_step(&step, &next_step, &reverse_step, db_graph);
+            db_graph_get_next_step(&step, &next_step, &reverse_step, db_graph);                    
             
             if(!db_node_check_for_any_flag(step.node, step.orientation == forward? VISITED_FORWARD:VISITED_REVERSE))
             {
@@ -105,7 +107,6 @@ Nucleotide coverage_walk_get_best_label(dBNode* node, Orientation orientation, d
             }
         }
     }
-
     nucleotide_iterator(&check_edge);
 
     return label;
@@ -349,32 +350,32 @@ static boolean coverage_walk_continue_traversing(pathStep * current_step,
         path_get_step_at_index(0, &first, temp_path);
         if (path_step_equals_without_label(&first, current_step)) {
             cont = false;
-            log_printf("\n[coverage_walk_continue_traversing] End of path due to undefined label.");
+            //log_printf("\n[coverage_walk_continue_traversing] End of path due to undefined label.");
         }
 
         /* Check for visited flag */
         if (db_node_check_for_any_flag(next_step->node, next_step->orientation == forward? VISITED_FORWARD:VISITED_REVERSE)) {
             cont = false;
-            log_printf("\n[coverage_walk_continue_traversing] End of path due to visited node.");
+            //log_printf("\n[coverage_walk_continue_traversing] End of path due to visited node.");
         }
 
         /* Now check for one or more edges moving forward */
         if (db_node_edges_count_all_colours(current_step->node, current_step->orientation) == 0) {
             path_add_stop_reason(LAST, PATH_FLAG_STOP_BLUNT_END, temp_path);
             cont = false;
-            log_printf("\n[coverage_walk_continue_traversing] End of path due to blunt end.");
+            //log_printf("\n[coverage_walk_continue_traversing] End of path due to blunt end.");
         }
 
         /* Check path has space */
         if (!path_has_space(temp_path)) {
             path_add_stop_reason(LAST, PATH_FLAG_LONGER_THAN_BUFFER, temp_path);
             cont = false;
-            log_printf("\n[coverage_walk_continue_traversing] End of path due to path buffer too small.");
+            //log_printf("\n[coverage_walk_continue_traversing] End of path due to path buffer too small.");
         }
 
         /*  check coverage for next step meets min threshold */
         if (element_get_coverage_all_colours(next_step->node) < db_graph->path_coverage_minimum){
-          log_printf("\n[coverage_walk_continue_traversing] End of path due to too small coverage.");
+          //log_printf("\n[coverage_walk_continue_traversing] End of path due to too small coverage.");
           cont = false;
         }
     }
