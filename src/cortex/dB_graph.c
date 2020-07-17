@@ -1156,86 +1156,91 @@ void db_graph_write_graphviz_file(char *filename, dBGraph * db_graph)
 	FILE *fp;
 
 	void print_graphviz_colours(dBNode * node) {
-		if (node != NULL) {
-			BinaryKmer tmp, co;
-			short kmer_size = db_graph->kmer_size;
-			binary_kmer_assignment_operator(tmp, node->kmer);
-			binary_kmer_reverse_complement(&tmp, kmer_size, &co);
-			char seq[kmer_size + 1], seqNext[kmer_size + 1], seq1[kmer_size + 1];
-			binary_kmer_to_seq(&tmp, kmer_size, seq1);
-			char *print = db_node_check_for_any_flag(node, STARTING_FORWARD  | BRANCH_NODE_FORWARD | BRANCH_NODE_REVERSE | END_NODE_FORWARD | END_NODE_REVERSE | X_NODE) ? "ellipse" : "ellipse";
-			char *node_colour = "black";
+            if (node != NULL && element_get_coverage_all_colours(node) > 0) 
+            {
+                BinaryKmer tmp, co;
+                short kmer_size = db_graph->kmer_size;
+                binary_kmer_assignment_operator(tmp, node->kmer);
+                binary_kmer_reverse_complement(&tmp, kmer_size, &co);
+                char seq[kmer_size + 1], seqNext[kmer_size + 1], seq1[kmer_size + 1];
+                binary_kmer_to_seq(&tmp, kmer_size, seq1);
+                char *print = db_node_check_for_any_flag(node, STARTING_FORWARD  | BRANCH_NODE_FORWARD | BRANCH_NODE_REVERSE | END_NODE_FORWARD | END_NODE_REVERSE | X_NODE) ? "ellipse" : "ellipse";
+                char *node_colour = "black";
 
-      if (db_node_check_for_any_flag(node, BRANCH_NODE_FORWARD | BRANCH_NODE_REVERSE | X_NODE)) {
-	       print = "circle";
-      }
+                if (db_node_check_for_any_flag(node, BRANCH_NODE_FORWARD | BRANCH_NODE_REVERSE | X_NODE)) {
+                         print = "circle";
+                }
 
-			char reverse_seq1[kmer_size + 1];
-			char label_string[512];
+                char reverse_seq1[kmer_size + 1];
+                char label_string[512];
 
-			seq_reverse_complement(seq1, kmer_size, reverse_seq1);
-			//sprintf(label_string, "\"%s\\n%s\\nC0=%d C1=%d\"", seq1, reverse_seq1, node->coverage[0], node->coverage[1]);
+                seq_reverse_complement(seq1, kmer_size, reverse_seq1);
+                //sprintf(label_string, "\"%s\\n%s\\nC0=%d C1=%d\"", seq1, reverse_seq1, node->coverage[0], node->coverage[1]);
 
-			sprintf(label_string,
-      "<<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\">"
-      "<tr><td><font color=\"blue\">%s</font></td></tr>"
-      "<tr><td><font color=\"red\">%s</font></td></tr>"
-      "<tr><td><font color=\"black\">%d</font> </td></tr>"
-      "</table>>", seq1, reverse_seq1,
-      node->coverage[0]
-      );
+                sprintf(label_string,
+                        "<<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\">"
+                        "<tr><td><font color=\"blue\">%s</font></td></tr>"
+                        "<tr><td><font color=\"red\">%s</font></td></tr>"
+                        "<tr><td><font color=\"black\">%d</font> </td></tr>"
+                        "</table>>", seq1, reverse_seq1,
+                        node->coverage[0]
+                        );
 
-      fprintf(fp, "%s [label=%s, shape=%s, color=%s]\n", seq1, label_string, print, node_colour);
+                fprintf(fp, "%s [label=%s, shape=%s, color=%s]\n", seq1, label_string, print, node_colour);
 
-			binary_kmer_to_seq(&tmp, kmer_size, seq);
-			binary_kmer_left_shift(&tmp, 2, kmer_size);
-			Orientation o = forward;
-			Edges all_edges = db_node_get_edges_for_orientation_all_colours(node, o);
-			Edges ea[NUMBER_OF_COLOURS];
-			int i;
+                binary_kmer_to_seq(&tmp, kmer_size, seq);
+                binary_kmer_left_shift(&tmp, 2, kmer_size);
+                Orientation o = forward;
+                Edges all_edges = db_node_get_edges_for_orientation_all_colours(node, o);
+                Edges ea[NUMBER_OF_COLOURS];
+                int i;
 
-      if (all_edges < 0) {
-          // Do something???
-      }
+                if (all_edges < 0) {
+                    // Do something???
+                }
 
-			for (i = 0; i < NUMBER_OF_COLOURS; i++) {
-				ea[i] = db_node_get_edges_for_orientation_by_colour(node, o, i);
-      }
+                for (i = 0; i < NUMBER_OF_COLOURS; i++) {
+                        ea[i] = db_node_get_edges_for_orientation_by_colour(node, o, i);
+                }
 
-			void hasEdge(Nucleotide n) {
-				BinaryKmer bk;
-				Key k = &bk;
-				boolean colour0edge = (((ea[0] >> n) & 1) == 1);
-				boolean colour1edge = false;
+                void hasEdge(Nucleotide n) {
+                    BinaryKmer bk;
+                    Key k = &bk;
+                    boolean colour0edge = (((ea[0] >> n) & 1) == 1);
+                    boolean colour1edge = false;
 
-				if (colour0edge || colour1edge) {
-					char *labelcolour = (colour0edge && colour1edge) ? "black":(colour0edge ? "green":"orange");
-					binary_kmer_modify_base(&tmp, n, kmer_size, 0);
-					binary_kmer_to_seq(element_get_key(&tmp, kmer_size, k), kmer_size, seqNext);
-					fprintf(fp, "%s -> %s [ label=<<font color=\"%s\">%c</font>>, color=\"%s\"];\n", seq, seqNext, labelcolour, binary_nucleotide_to_char(n), o == forward ? "blue" : "red");
-				}
-			}
+                    if (colour0edge || colour1edge) {
+                            char *labelcolour = (colour0edge && colour1edge) ? "black":(colour0edge ? "green":"orange");
+                            binary_kmer_modify_base(&tmp, n, kmer_size, 0);
+                            binary_kmer_to_seq(element_get_key(&tmp, kmer_size, k), kmer_size, seqNext);
+                            fprintf(fp, "%s -> %s [ label=<<font color=\"%s\">%c</font>>, color=\"%s\"];\n", seq, seqNext, labelcolour, binary_nucleotide_to_char(n), o == forward ? "blue" : "red");
+                    }
+                }
 
-			nucleotide_iterator(&hasEdge);
-			binary_kmer_assignment_operator(tmp, co);
-			binary_kmer_left_shift(&tmp, 2, kmer_size);
+                nucleotide_iterator(&hasEdge);
+                binary_kmer_assignment_operator(tmp, co);
+                binary_kmer_left_shift(&tmp, 2, kmer_size);
 
-			o = reverse;
-			all_edges = db_node_get_edges_for_orientation_all_colours(node, o);
-			for (i = 0; i < NUMBER_OF_COLOURS; i++) {
-				ea[i] = db_node_get_edges_for_orientation_by_colour(node, o, i);
-      }
-			nucleotide_iterator(&hasEdge);
-		}
+                o = reverse;
+                all_edges = db_node_get_edges_for_orientation_all_colours(node, o);
+                for (i = 0; i < NUMBER_OF_COLOURS; i++) {
+                    ea[i] = db_node_get_edges_for_orientation_by_colour(node, o, i);
+                }
+                nucleotide_iterator(&hasEdge);
+            }
 	}
 
-	if (db_graph->unique_kmers < 450) {
-		if (filename) {
-			fp = fopen(filename, "w");
-		} else {
-			fp = stderr;
+	//if (db_graph->unique_kmers < 450) {
+		if (filename) 
+                {
+                    fp = fopen(filename, "w");
+		} 
+                else 
+                {
+                    fp = stderr;
 		}
-		if (fp) {
+		if (fp) 
+                {
 			fprintf(fp, "digraph finite_state_machine {\n");
 			fprintf(fp, "\trankdir=LR;\n");
 			fprintf(fp, "\tsize=\"12,8\";\n");
@@ -1244,11 +1249,11 @@ void db_graph_write_graphviz_file(char *filename, dBGraph * db_graph)
 			hash_table_traverse(&print_graphviz_colours, db_graph);
 			fprintf(fp, "}\n");
 			fclose(fp);
+                        printf("\nWritten graphviz file %s.\n\n", filename);
 		}
-		printf("\nWritten graphviz file %s.\n\n", filename);
-	} else {
-		printf("\nNote: Too many kmers to output graphviz file.\n\n");
-	}
+	//} else {
+	//	printf("\nNote: Too many kmers to output graphviz file.\n\n");
+	//}
 }
 
 // Build array of neighbouring nodes
@@ -1388,7 +1393,233 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
     
     return return_step;
 }
+
+
+// breadth first search
+pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path** new_path_ptr, dBGraph* db_graph)
+{
+    assert(new_path_ptr != NULL && *new_path_ptr == NULL);
     
+    dBNode* node = first_step->node;
+    Orientation orientation = first_step->orientation;
+    pathStep join_step;
+    join_step.node = NULL;
+    join_step.orientation = undefined;
+    join_step.label = undefined;
+    
+    boolean joined = false;
+     
+    Queue* step_queue = queue_new(2000, sizeof(pathStep*));
+    pathStep* new_step = malloc(sizeof(pathStep));
+    new_step->node = first_step->node;
+    new_step->orientation = first_step->orientation;
+    queue_push_step(step_queue, new_step);
+   
+    typedef struct
+    {
+        dBNode* child_node;
+        dBNode* parent_node;
+        Path* path;
+    } parent_child;
+    Queue* parent_child_list = queue_new(2000, sizeof(parent_child*));
+    
+    
+    // Clear the graph of VISITED_FORWARD/REVERSE flags
+    hash_table_traverse_no_progress_bar(&db_node_action_unset_flag_visited_forward_reverse, db_graph);
+    // mark the path
+    boolean mark = false;
+    for(int i = 0; i < main_path->length; i++)
+    {
+        if(mark)
+        {
+            if(main_path->orientations[i] == forward)
+            {
+                flags_action_set_flag(CURRENT_PATH_FORWARD, &main_path->nodes[i]->flags);
+            }
+            else
+            {
+                flags_action_set_flag(CURRENT_PATH_REVERSE, &main_path->nodes[i]->flags);
+            }
+        }
+        
+        if(main_path->nodes[i] == node && main_path->orientations[i] == orientation)
+        {
+            mark = true;
+        }
+    }
+    assert(mark);
+    
+    // function to walk perfect path from node/orientation/n
+    // adds node at end of path to queue if unvisited
+    void walk_if_exists(Nucleotide n) 
+    {
+        if(node == first_step->node && n != first_step->label)
+        {
+            return;
+        }
+        //TODO: Check coverage is big enough?
+        if (db_node_edge_exist_any_colour(node, n, orientation)) 
+        {
+            // Get first node along this edge and check we've not already visited it...
+            Orientation next_orientation;
+            Nucleotide reverse_nucleotide;
+            dBNode * next_node;
+            next_node = db_graph_get_next_node(node, orientation, &next_orientation, n, &reverse_nucleotide, db_graph);
+            if (!next_node) {
+                log_and_screen_printf("Error: Something went wrong with db_graph_get_next_node\n");
+                exit(-1);
+            }
+
+            // If not already visited the first node, walk it...
+            if (!db_node_check_flag_visited_with_orientation(next_node, next_orientation)) 
+            {
+                pathStep new_first_step;
+                Path * new_path;
+
+                // Get path
+                new_first_step.node = node;
+                new_first_step.orientation = orientation;
+                new_first_step.label = n;
+                new_first_step.flags = 0;
+                new_path = path_new(200000, db_graph->kmer_size);
+                if (!new_path) 
+                {
+                    log_and_screen_printf("ERROR: Not enough memory to allocate new path.\n");
+                    return;
+                }
+
+                db_graph_get_perfect_path_with_first_edge_all_colours(&new_first_step, &db_node_action_do_nothing, new_path, db_graph);
+                // Now go through all nodes, look for one that joins the main path
+                for (int i=1; i<new_path->length; i++) 
+                {
+                    dBNode* current_node = new_path->nodes[i];
+                    Orientation current_orientation = new_path->orientations[i];
+                    db_node_action_set_flag_visited_with_orientation(current_node, current_orientation);
+                    if( (current_orientation == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(current_node->flags))) ||
+                        (current_orientation == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(current_node->flags))) )
+                    {
+                        join_step.node = current_node;
+                        join_step.orientation = current_orientation;
+                        joined = true;
+                        
+                        parent_child* pc = malloc(sizeof(parent_child));
+                        pc->child_node = current_node;
+                        pc->parent_node = node;
+                        pc->path = path_new(i+1, db_graph->kmer_size);
+                        path_copy_subpath(pc->path, new_path, 0, i+1);
+                        queue_push(parent_child_list, pc);
+                        
+                        return; 
+                    }
+                    
+                    uint32_t coverage = element_get_coverage_all_colours(current_node);
+                    if(coverage < db_graph->path_coverage_minimum)
+                    {
+                        // don't use this path if the coverage is too small!
+                        return;
+                    }
+                }
+                
+                // Add end node to list of nodes to visit
+                if(!joined)
+                {
+                    dBNode* end_node = new_path->nodes[new_path->length-1];
+                    Orientation end_orientation = new_path->orientations[new_path->length-1];
+                    if (!db_node_check_flag_visited_with_orientation(end_node, end_orientation)) 
+                    {
+                        if (!db_node_is_blunt_end_all_colours(end_node, end_orientation)) 
+                        {
+                            pathStep* next_step = malloc(sizeof(pathStep));
+                            next_step->node = end_node;
+                            next_step->orientation = end_orientation;
+                            if (queue_push_step(step_queue, next_step) == NULL) 
+                            {
+                                log_and_screen_printf("Queue too large. Ending.\n");
+                                exit(1);
+                            }
+
+                            parent_child* pc = malloc(sizeof(parent_child));
+                            pc->child_node = end_node;
+                            pc->parent_node = node;
+                            pc->path = new_path;
+                            queue_push(parent_child_list, pc);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    while (step_queue->number_of_items > 0 && !joined) 
+    {
+        // Take top node from list
+        pathStep* next_step = queue_pop(step_queue);
+        node = next_step->node;
+        orientation = next_step->orientation;
+        // Look at all paths out from here
+        nucleotide_iterator(&walk_if_exists);
+        
+        free(next_step);
+    }
+
+    queue_free(step_queue);
+    
+    PathArray* pa = path_array_new(10);
+    if(joined)
+    {
+        // Now backtrace to create bubble path
+        dBNode* current_child = join_step.node;
+        assert(parent_child_list->number_of_items > 0);
+        do
+        {
+            for(int i = 0; i < parent_child_list->number_of_items; i++)
+            {
+                parent_child* pc = parent_child_list->items[i];
+                if(pc->child_node == current_child)
+                {
+                    path_array_add_path(pc->path, pa);
+                    current_child = pc->parent_node;
+                    pc->path = NULL;
+                    break;
+                }
+            }
+        }
+        while(current_child != first_step->node);
+
+        Path* new_path = path_array_merge_to_path(pa, true, db_graph);
+        *new_path_ptr = new_path;
+        
+/*
+        assert(join_step.node != NULL);
+        assert(new_path->nodes[new_path->length - 1] == join_step.node);
+        assert(new_path->orientations[new_path->length - 1] == join_step.orientation);
+        log_printf("[db_graph_search_for_bubble2] Found bubble with sequence %s\n", new_path->seq);
+        log_printf("[db_graph_search_for_bubble2] and length %i\n", new_path->length);
+*/
+    }
+    
+    // unmark the path
+    for(int i = 0; i < main_path->length; i++)
+    {
+        flags_action_unset_flag(CURRENT_PATH_FORWARD, &main_path->nodes[i]->flags);
+        flags_action_unset_flag(CURRENT_PATH_REVERSE, &main_path->nodes[i]->flags);
+    }
+    
+    // free all the paths
+    for(int i = 0; i < parent_child_list->number_of_items; i++)
+    {
+        parent_child* pc = parent_child_list->items[i];
+        if(pc->path)
+        {
+            path_destroy(pc->path);
+        }
+    }
+    queue_free(parent_child_list);
+    path_array_destroy(pa);
+    return join_step;
+}
+
+// iterative depth first search choosing path with max coverage at each step.
 pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path** new_path_ptr, dBGraph* db_graph)
 {
     assert(new_path_ptr != NULL && *new_path_ptr == NULL);
@@ -1414,7 +1645,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     int max_path_size = main_path->length * 10;
     int max_path_array_total_size = max_path_size * 100;
     
-    //Clear the graph of VISITED_FORWARD/REVERSE flags
+    // Clear the graph of VISITED_FORWARD/REVERSE flags
     hash_table_traverse_no_progress_bar(&db_node_action_unset_flag_visited_forward_reverse, db_graph);
     // mark the path
     for(int i = 0; i < main_path->length; i++)
@@ -1542,6 +1773,8 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
                 bcp_array[base].coverage = element_get_coverage_all_colours(next_node);                   
             }      
         }
+        
+        // sort via coverage so that we add the highest coverage first
         qsort((void*)bcp_array, 4, sizeof(base_coverage_pair), compare);
 
         //TODO: Check that the total length of the path array isn't too big!

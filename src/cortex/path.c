@@ -2557,6 +2557,7 @@ boolean path_append(Path * destination, Path * source){
         new_step.label = source->labels[i];
         new_step.flags = source->step_flags[i];
         if (!path_add_node(&new_step, destination)) {
+            log_printf("[path_append] Could not append paths successfully.\n");
             success = false;
             break;
         } else {
@@ -3151,7 +3152,6 @@ out_struct write_paths_between_nodes(  Path* path,
         subpaths[i].m_nucleotide = i;
         subpaths[i].m_path = NULL;
     }
-
     boolean polymorphism = false;
     int polymorphism_end_pos = -1;
     int polymorphism_start_pos = -1;
@@ -3165,13 +3165,22 @@ out_struct write_paths_between_nodes(  Path* path,
     
     // Go through all the nodes in the path (except the last one) to check for branches.
     while(current_pos < end_pos)
-    {
+    {       
         dBNode* current_node = path->nodes[current_pos];
         Orientation current_orientation = path->orientations[current_pos];
         int edges = db_node_edges_count(current_node, current_orientation);
         if(fastg_recursion_level <= MAX_GFA_RECURSIONS && edges > 1 && current_pos != end_pos - 1)
         {
             log_printf("Potential polymorphism at position %i\n", current_pos);
+            // reset the subpaths
+            for(int i = 0; i < 4; i++)
+            {
+                subpaths[i].m_join_pos = -1;
+                subpaths[i].m_length = -1;
+                subpaths[i].m_nucleotide = i;
+                subpaths[i].m_path = NULL;
+            }
+            
             // this node is a candidate for a polymorphism
             // check every edge leaving this node
             for(int i = 0; i < 4; i++)
@@ -3198,11 +3207,12 @@ out_struct write_paths_between_nodes(  Path* path,
                     }                
                     else
                     {                
-
                         log_printf("Creating path %i\n", i);
-                        pathStep join_step = db_graph_search_for_bubble(path, &current_step, &subpaths[i].m_path, graph);
+                        pathStep join_step = db_graph_search_for_bubble2(path, &current_step, &subpaths[i].m_path, graph);
                         if(join_step.node != NULL)
                         {
+                            assert(subpaths[i].m_path != NULL);
+                            assert(subpaths[i].m_path->length > 0);
                             for(int j = current_pos; j < path->length; ++j)
                             {
                                 if(path->nodes[j] == join_step.node && path->orientations[j] == join_step.orientation)
@@ -3225,6 +3235,8 @@ out_struct write_paths_between_nodes(  Path* path,
                                 path_destroy(subpaths[i].m_path);
                                 subpaths[i].m_path = NULL;
                             }
+                            subpaths[i].m_join_pos = -1;
+                            subpaths[i].m_length = -1;
                         }
                     }
                 }
@@ -3482,6 +3494,7 @@ out_struct write_paths_between_nodes(  Path* path,
                 // do the subpath            
                 if(main_end_pos >= 0)
                 {
+                    log_printf("Alt Path... length %i\n", subpaths[i].m_path->length);
                     out_struct alt_out = write_paths_between_nodes(subpaths[i].m_path, 0, subpaths[i].m_length, graph, current_segment_array, true, file_gfa, file_fastg);
                     alt_segments = alt_out.m_segments;
                 }
@@ -3492,6 +3505,7 @@ out_struct write_paths_between_nodes(  Path* path,
                     int length = main_end_pos - main_start_pos;
                     if(length > 0)
                     {
+                        log_printf("Main Path...\n");
                         out_struct main_out = write_paths_between_nodes(path, main_start_pos, main_end_pos, graph, out_segments, true, file_gfa, file_fastg);
                         main_segments = main_out.m_segments;
                     }

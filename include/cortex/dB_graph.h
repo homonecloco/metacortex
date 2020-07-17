@@ -283,6 +283,7 @@ Nucleotide db_graph_get_best_next_step_nucleotide(dBNode * from, dBNode * previo
 void db_graph_calculate_stats(dBGraph * db_graph);
 
 pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path** new_path_ptr, dBGraph * db_graph);
+pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path** new_path_ptr, dBGraph * db_graph);
 pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_graph);
 
 

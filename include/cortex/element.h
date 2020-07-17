@@ -271,4 +271,8 @@ boolean elemet_is_assigned(Element * node);
 
 boolean element_check_for_flag(Element * node, Flags flag);
 
+boolean db_node_check_flag_visited_with_orientation(dBNode * node, Orientation orientation);
+
+void db_node_action_set_flag_visited_with_orientation(dBNode * node, Orientation orientation);
+
 #endif /* ELEMENT_H_ */

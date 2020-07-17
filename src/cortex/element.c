@@ -1098,3 +1098,35 @@ boolean element_check_for_flag(Element * node, Flags flag)
 {
     return db_node_check_for_flag((dBNode *) node, flag);
 }
+
+boolean db_node_check_flag_visited_with_orientation(dBNode * node, Orientation orientation)
+{
+    if(orientation == forward)
+    {
+        return db_node_check_for_flag(node, VISITED_FORWARD);
+    }
+    else if(orientation == reverse)
+    {
+        return db_node_check_for_flag(node, VISITED_REVERSE);
+    }
+    else
+    {
+        return false;
+    }
+}
+
+void db_node_action_set_flag_visited_with_orientation(dBNode * node, Orientation orientation)
+{
+    if(orientation == forward)
+    {
+        return db_node_action_set_flag(node, VISITED_FORWARD);
+    }
+    else if(orientation == reverse)
+    {
+        return db_node_action_set_flag(node, VISITED_REVERSE);
+    }
+    else
+    {
+        return;
+    }   
+}
