@@ -1394,7 +1394,9 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
     return return_step;
 }
 
-
+#define BUBBLE_QUEUE_SIZE 20000000 // 10000000
+#define MAX_EXPLORE_BUBBLE_LENGTH 2000000
+#define MAX_EXPLORE_BUBBLE_JUNCTIONS 2000
 // breadth first search
 pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path** new_path_ptr, dBGraph* db_graph)
 {
@@ -1409,7 +1411,8 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
     
     boolean joined = false;
      
-    Queue* step_queue = queue_new(2000, sizeof(pathStep*));
+    Queue* step_queue = queue_new(MAX_EXPLORE_BUBBLE_JUNCTIONS, sizeof(pathStep*));
+    Queue* node_queue_for_flags = node_queue_new(BUBBLE_QUEUE_SIZE);
     pathStep* new_step = malloc(sizeof(pathStep));
     new_step->node = first_step->node;
     new_step->orientation = first_step->orientation;
@@ -1421,11 +1424,8 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
         dBNode* parent_node;
         Path* path;
     } parent_child;
-    Queue* parent_child_list = queue_new(2000, sizeof(parent_child*));
-    
-    
-    // Clear the graph of VISITED_FORWARD/REVERSE flags
-    hash_table_traverse_no_progress_bar(&db_node_action_unset_flag_visited_forward_reverse, db_graph);
+    Queue* parent_child_list = queue_new(MAX_EXPLORE_BUBBLE_JUNCTIONS, sizeof(parent_child*));
+   
     // mark the path
     boolean mark = false;
     for(int i = 0; i < main_path->length; i++)
@@ -1481,7 +1481,7 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
                 new_first_step.orientation = orientation;
                 new_first_step.label = n;
                 new_first_step.flags = 0;
-                new_path = path_new(200000, db_graph->kmer_size);
+                new_path = path_new(MAX_EXPLORE_BUBBLE_LENGTH, db_graph->kmer_size);
                 if (!new_path) 
                 {
                     log_and_screen_printf("ERROR: Not enough memory to allocate new path.\n");
@@ -1495,6 +1495,7 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
                     dBNode* current_node = new_path->nodes[i];
                     Orientation current_orientation = new_path->orientations[i];
                     db_node_action_set_flag_visited_with_orientation(current_node, current_orientation);
+                    queue_push(node_queue_for_flags, current_node);
                     if( (current_orientation == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(current_node->flags))) ||
                         (current_orientation == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(current_node->flags))) )
                     {
@@ -1604,6 +1605,14 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
         flags_action_unset_flag(CURRENT_PATH_FORWARD, &main_path->nodes[i]->flags);
         flags_action_unset_flag(CURRENT_PATH_REVERSE, &main_path->nodes[i]->flags);
     }
+    
+    // unmark the VISITED_FORWARD/REVERSE
+    while(node_queue_for_flags->number_of_items > 0) 
+    {
+        dBNode* queue_node = (dBNode*)queue_pop(node_queue_for_flags);
+        db_node_action_unset_flag_visited_forward_reverse(queue_node);
+    }
+    queue_free(node_queue_for_flags);
     
     // free all the paths
     for(int i = 0; i < parent_child_list->number_of_items; i++)
