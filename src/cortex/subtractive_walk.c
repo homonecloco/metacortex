@@ -45,7 +45,7 @@
 
 
 
-#define SUBTRACTIVE_WALK_QUEUE_SIZE 200000 // 10000000
+#define SUBTRACTIVE_WALK_QUEUE_SIZE 20000000 // 10000000
 
 
 // ----------------------------------------------------------------------
