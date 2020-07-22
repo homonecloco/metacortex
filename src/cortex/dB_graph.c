@@ -1425,8 +1425,14 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
         Path* path;
     } parent_child;
     Queue* parent_child_list = queue_new(MAX_EXPLORE_BUBBLE_JUNCTIONS, sizeof(parent_child*));
+    
+    if(!step_queue || !node_queue_for_flags || !parent_child_list)
+    {
+        log_and_screen_printf("[db_graph_search_for_bubble2] Couldn't get memory for queue. Exiting...\n");
+        exit(-1);
+    }
    
-    // mark the path
+    // mark the path after starting node
     boolean mark = false;
     for(int i = 0; i < main_path->length; i++)
     {
@@ -1457,35 +1463,30 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
         {
             return;
         }
-        //TODO: Check coverage is big enough?
+     
         if (db_node_edge_exist_any_colour(node, n, orientation)) 
         {
             // Get first node along this edge and check we've not already visited it...
             Orientation next_orientation;
             Nucleotide reverse_nucleotide;
-            dBNode * next_node;
+            dBNode* next_node;
             next_node = db_graph_get_next_node(node, orientation, &next_orientation, n, &reverse_nucleotide, db_graph);
-            if (!next_node) {
-                log_and_screen_printf("Error: Something went wrong with db_graph_get_next_node\n");
-                exit(-1);
-            }
 
             // If not already visited the first node, walk it...
             if (!db_node_check_flag_visited_with_orientation(next_node, next_orientation)) 
             {
                 pathStep new_first_step;
-                Path * new_path;
 
                 // Get path
                 new_first_step.node = node;
                 new_first_step.orientation = orientation;
                 new_first_step.label = n;
                 new_first_step.flags = 0;
-                new_path = path_new(MAX_EXPLORE_BUBBLE_LENGTH, db_graph->kmer_size);
+                Path* new_path = path_new(MAX_EXPLORE_BUBBLE_LENGTH, db_graph->kmer_size);
                 if (!new_path) 
                 {
-                    log_and_screen_printf("ERROR: Not enough memory to allocate new path.\n");
-                    return;
+                    log_and_screen_printf("[db_graph_search_for_bubble2] ERROR: Not enough memory to allocate new path.\n");
+                    exit(-1);
                 }
 
                 db_graph_get_perfect_path_with_first_edge_all_colours(&new_first_step, &db_node_action_do_nothing, new_path, db_graph);
@@ -1508,27 +1509,22 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
                         pc->parent_node = node;
                         pc->path = path_new(i+1, db_graph->kmer_size);
                         path_copy_subpath(pc->path, new_path, 0, i+1);
+                        path_destroy(new_path);
                         queue_push(parent_child_list, pc);
                         
                         return; 
-                    }
-                    
-                    uint32_t coverage = element_get_coverage_all_colours(current_node);
-                    if(coverage < db_graph->path_coverage_minimum)
-                    {
-                        // don't use this path if the coverage is too small!
-                        return;
-                    }
+                    }                  
                 }
                 
                 // Add end node to list of nodes to visit
-                if(!joined)
+                assert(!joined);             
+                dBNode* end_node = new_path->nodes[new_path->length-1];
+                Orientation end_orientation = new_path->orientations[new_path->length-1];
+                if (!db_node_check_flag_visited_with_orientation(end_node, end_orientation)) 
                 {
-                    dBNode* end_node = new_path->nodes[new_path->length-1];
-                    Orientation end_orientation = new_path->orientations[new_path->length-1];
-                    if (!db_node_check_flag_visited_with_orientation(end_node, end_orientation)) 
+                    if (!db_node_is_blunt_end_all_colours(end_node, end_orientation)) 
                     {
-                        if (!db_node_is_blunt_end_all_colours(end_node, end_orientation)) 
+                        if(element_get_coverage_all_colours(end_node) > db_graph->path_coverage_minimum)
                         {
                             pathStep* next_step = malloc(sizeof(pathStep));
                             next_step->node = end_node;
@@ -1544,9 +1540,11 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
                             pc->parent_node = node;
                             pc->path = new_path;
                             queue_push(parent_child_list, pc);
+                            return;
                         }
                     }
-                }
+                }                
+                path_destroy(new_path);              
             }
         }
     }
@@ -1563,6 +1561,12 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
         free(next_step);
     }
 
+    // free remaining pathSteps from step_queue
+    while (step_queue->number_of_items > 0)
+    {
+        pathStep* next_step = queue_pop(step_queue);
+        free(next_step);
+    }
     queue_free(step_queue);
     
     PathArray* pa = path_array_new(10);
