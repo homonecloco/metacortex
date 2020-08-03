@@ -66,8 +66,8 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename, int min
     }
 
     Path *simple_path = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
-    Path *path_fwd = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
-    Path *path_rev = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
+   // Path *path_fwd = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
+    //Path *path_rev = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
 
 
    /* Open contigs file */
@@ -83,7 +83,7 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename, int min
     void traversal_for_contigs(dBNode * node) 
     {
         uint32_t coverage = element_get_coverage_all_colours(node);     
-        if(coverage >= graph->path_coverage_minimum)
+        //if(coverage >= graph->path_coverage_minimum)
         {
             
             dBNode* seed_node = NULL;
@@ -91,16 +91,16 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename, int min
             /* Grow graph from this node, returning the 'best' (highest coverage) node to store as seed point */
             log_printf("Growing graph from node\n");
             graph_queue->number_of_items = 0;
-            int nodes_in_graph = grow_graph_from_node(node, &seed_node, graph, graph_queue, 1000);
+            int nodes_in_graph = grow_graph_from_node(node, &seed_node, graph, graph_queue, MAX_EXPLORE_BRANCHES);
             
             if(nodes_in_graph > min_path_size && seed_node)
             {
                 node = seed_node;
-                coverage_walk_get_path(node, forward, NULL, graph, path_fwd, false);
-                coverage_walk_get_path(node, reverse, NULL, graph, path_rev, false);
+                coverage_walk_get_path(node, forward, NULL, graph, simple_path, false);
+               // coverage_walk_get_path(node, reverse, NULL, graph, path_rev, false);
 
-                path_reverse(path_fwd, simple_path);
-                path_append(simple_path, path_rev);
+               // path_reverse(path_fwd, simple_path);
+               // path_append(simple_path, path_rev);
 
                 simple_path->id = counter++;
 
@@ -114,13 +114,17 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename, int min
                     char* filename;
                     asprintf(&filename, "node_%qd.hist", simple_path->id);
                     FILE* hist_file = fopen(filename, "w");
+                    int last_coverage = 0;
                     for(int n = 0; n < simple_path->length; n++)
                     {
                         dBNode* current_node = simple_path->nodes[n];
                         Orientation current_orientation = simple_path->orientations[n];
                         uint32_t coverage = element_get_coverage_all_colours(current_node);
                         int num_edges = db_node_edges_count_all_colours(current_node, current_orientation);
-                        fprintf(hist_file, "%u\t%i\n", coverage, num_edges);
+                        int diff = coverage - last_coverage;
+                        float normalised = (float)diff/last_coverage;
+                        fprintf(hist_file, "%u\t%f\t%i\n", coverage, normalised, num_edges);
+                        last_coverage = coverage;
                     }
                     fclose(hist_file);
 */
@@ -150,11 +154,11 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename, int min
                     uint32_t cov = element_get_coverage_all_colours(current_node);
                     int diff = cov - last_cov;
                     float delta = (float)diff/last_cov;
-                    if(diff > 1)
+                    if(diff > delta_coverage)
                     {
                         current_level++;
                     }
-                    else if(diff < -1 && current_level > 1)
+                    else if(diff < -delta_coverage && current_level > 1)
                     {
                         current_level--;
                     }
@@ -169,11 +173,11 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename, int min
                     uint32_t cov = element_get_coverage_all_colours(current_node);
                     int diff = cov - last_cov;
                     float delta = (float)diff/last_cov;
-                    if(diff > 1)
+                    if(diff > delta_coverage)
                     {
                         current_level++;
                     }
-                    else if(diff < -1 && current_level > 1)
+                    else if(diff < -delta_coverage && current_level > 1)
                     {
                         current_level--;
                     }
@@ -207,8 +211,8 @@ void subtractive_walk(dBGraph * graph, char* consensus_contigs_filename, int min
                 }              
                 /* Reset paths */
                 path_reset(simple_path);
-                path_reset(path_fwd);
-                path_reset(path_rev);
+               // path_reset(path_fwd);
+                //path_reset(path_rev);
             }
             
             while (graph_queue->number_of_items > 0) 

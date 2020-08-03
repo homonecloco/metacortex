@@ -158,7 +158,8 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
     }
 
     // Now keep visiting nodes and walking paths
-    while (nodes_to_walk->number_of_items > 0 && nodes_to_walk->number_of_items < max_search_size) {
+    int i = 0;
+    while (nodes_to_walk->number_of_items > 0 && i < max_search_size) {
         // Take top node from list
         node = queue_pop_node(nodes_to_walk, &depth);
 
@@ -167,6 +168,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
         nucleotide_iterator(&walk_if_exists);
         orientation = reverse;
         nucleotide_iterator(&walk_if_exists);
+        i++;
     }
 
     queue_free(nodes_to_walk);
@@ -188,8 +190,8 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
     FILE* fp_contigs_fastg;
     FILE* fp_contigs_gfa;
     Queue* graph_queue;
-    Path *path_fwd = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
-    Path *path_rev = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
+    //Path *path_fwd = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
+    //Path *path_rev = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
     Path *final_path = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
     char seq[256];
     char analysis_filename[256];
@@ -258,15 +260,15 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
             log_and_screen_printf("Error: NULL node passed to explore_node.\n");
             exit(-1);
         }
-
-        if (db_node_check_for_any_flag(node, PRUNED | VISITED) == false) {
+        uint32_t coverage = element_get_coverage_all_colours(node);
+        if (db_node_check_for_any_flag(node, PRUNED | VISITED) == false && coverage > graph->path_coverage_minimum) {
             dBNode* seed_node;
             int nodes_in_graph;
 
             /* Grow graph from this node, returning the 'best' (highest coverage) node to store as seed point */
             log_printf("Growing graph from node\n");
             graph_queue->number_of_items = 0;
-            nodes_in_graph = grow_graph_from_node(node, &seed_node, graph, graph_queue, 1000);
+            nodes_in_graph = grow_graph_from_node(node, &seed_node, graph, graph_queue, MAX_EXPLORE_BRANCHES);
             total_nodes += nodes_in_graph;
 
             if (seed_node == NULL) {
@@ -284,10 +286,11 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
                     int pi;
 
                     binary_kmer_to_seq(&(seed_node->kmer), graph->kmer_size, seq);
-                    coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd, true);
-                    coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev, true);
-                    path_reverse(path_fwd, final_path);
-                    path_append(final_path, path_rev);
+                    coverage_walk_get_path(seed_node, forward, NULL, graph, final_path, true);
+                    //coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd, true);
+                    //coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev, true);
+                    //path_reverse(path_fwd, final_path);
+                    //path_append(final_path, path_rev);
                     final_path->id = counter;
                     if (final_path->length >= (min_contig_length - graph->kmer_size)) {
                         log_printf("Write path of size %d\n", final_path->length);
@@ -323,9 +326,8 @@ AND AFTER IT ON CURRENT PATH
                     }
 
                     /* Reset paths */
-                    path_reset(path_fwd);
-                    //perfect_path_get_path(seed_node, forward, &db_node_action_do_nothing, graph, path_fwd);
-                    path_reset(path_rev);
+                    //path_reset(path_fwd);
+                    //path_reset(path_rev);
                     path_reset(final_path);
                 } else {
                     log_printf("  Number of nodes (%i) too small. Not outputting contig.\n", nodes_in_graph);

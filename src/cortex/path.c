@@ -630,9 +630,11 @@ void path_array_merge(PathArray ** from, PathArray * to){
 
 }
 
+// Create a new path consisting of all paths in the array merged into one (if possible).
+// Caller is responsible for freeing memory. Does not destroy original path array.
 Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order, dBGraph* db_graph)
 {
-    log_printf("[path_array_merge_to_path] Merging %i paths.\n", pa->number_of_paths);
+    //log_printf("[path_array_merge_to_path] Merging %i paths.\n", pa->number_of_paths);
     int path_length = 0;
     for(int i = 0; i < pa->number_of_paths; i++)
     {
@@ -658,7 +660,7 @@ Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order, dBGra
                 assert(path_step.label == Undefined);             
                 int next_index = reverse_array_order ? index - 1 : index + 1;
                 dBNode* next_node = pa->paths[next_index]->nodes[0];
-                
+                Orientation next_orientation = pa->paths[next_index]->orientations[0];
 /*
                 char end_kmer[db_graph->kmer_size + 1];
                 binary_kmer_to_seq(element_get_kmer(path_step.node), db_graph->kmer_size, end_kmer);
@@ -670,19 +672,29 @@ Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order, dBGra
                 log_printf("[path_array_merge_to_path] End node %s.\n", end_kmer);
                 log_printf("[path_array_merge_to_path] Start node %s.\n", start_kmer);
 */
-                
-                Orientation next_orientation;
+                if(next_node == path_step.node && next_orientation == path_step.orientation)
+                {
+                    // continue without adding path
+                    continue;
+                }
+                                     
                 Nucleotide rev_edge;
+                Orientation orientation;
                 for(int nucleotide = 0; nucleotide < 4; nucleotide++)
                 {
                     if(db_graph_get_next_node(  path_step.node, path_step.orientation, 
-                                                &next_orientation, nucleotide, &rev_edge, db_graph) == next_node)
+                                                &orientation, nucleotide, &rev_edge, db_graph) == next_node)
                     {
                         path_step.label = nucleotide;
                         break;
                     }
                 }
-                assert(path_step.label != Undefined);
+                if(path_step.label == Undefined)
+                {
+                    log_printf("[path_array_merge_to_path] Warning: Could not merge paths, are these really consecutive? Ignoring...\n");
+                    path_destroy(merged_path);
+                    return NULL;
+                }
             }
             
             if(merged_path->length >0)
@@ -3082,6 +3094,7 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
     file_wrapper.m_path_id = path->id;
     
     //start the recursion!
+
     fastg_recursion_level = 0;
     gfa_segment_array* in_segments = NULL;
     boolean skip_first = false;
@@ -3107,6 +3120,7 @@ void path_to_gfa2_and_fastg(Path* path, dBGraph* graph, FILE* file_gfa, FILE* fi
     {
         gfa_segment_array_destroy(in_segments);
     }    
+ 
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------------------*
@@ -3139,9 +3153,9 @@ out_struct write_paths_between_nodes(  Path* path,
                                 gfa_file_wrapper* file_gfa, 
                                 FILE* file_fastg)
 {
-    log_printf("\n--Write paths between nodes for sequence %s, between %i and %i, skip-first %i --\n", path->seq, start_pos, end_pos, skip_first);
+    //log_printf("\n--Write paths between nodes for sequence %s, between %i and %i, skip-first %i --\n", path->seq, start_pos, end_pos, skip_first);
     fastg_recursion_level++;
-    log_printf("Recursion level: %i\n", fastg_recursion_level);
+    //log_printf("Recursion level: %i\n", fastg_recursion_level);
     
     int current_pos = start_pos;
     subpath subpaths[4];
@@ -3171,7 +3185,7 @@ out_struct write_paths_between_nodes(  Path* path,
         int edges = db_node_edges_count(current_node, current_orientation);
         if(fastg_recursion_level <= MAX_GFA_RECURSIONS && edges > 1 && current_pos != end_pos - 1)
         {
-            log_printf("Potential polymorphism at position %i\n", current_pos);
+            //log_printf("Potential polymorphism at position %i\n", current_pos);
             // reset the subpaths
             for(int i = 0; i < 4; i++)
             {
@@ -3187,7 +3201,7 @@ out_struct write_paths_between_nodes(  Path* path,
             {
                 if(db_node_edge_exist_any_colour(current_node, i, current_orientation))
                 {
-                    log_printf("Branch at edge %i\n", i);
+                    //log_printf("Branch at edge %i\n", i);
 
                     pathStep current_step;
                     current_step.node = current_node;
@@ -3196,47 +3210,49 @@ out_struct write_paths_between_nodes(  Path* path,
                     
                     pathStep next_step, rev_step;
                     db_graph_get_next_step(&current_step, &next_step, &rev_step, graph);
-                    if(next_step.node == path->nodes[current_pos + 1])
+                    if(element_get_coverage_all_colours(next_step.node) >= graph->path_coverage_minimum)
                     {
-                        log_printf("Found main path.\n"); 
-                        main_subpath = i;
+                        if(next_step.node == path->nodes[current_pos + 1])
+                        {
+                            //log_printf("Found main path.\n"); 
+                            main_subpath = i;
 
-                        subpaths[i].m_join_pos = 0;
-                        subpaths[i].m_nucleotide = i;
-                        subpaths[i].m_length = current_pos - start_pos;
-                    }                
-                    else
-                    {                
-                        log_printf("Creating path %i\n", i);
-                        pathStep join_step = db_graph_search_for_bubble2(path, &current_step, &subpaths[i].m_path, graph);
-                        if(join_step.node != NULL)
-                        {
-                            assert(subpaths[i].m_path != NULL);
-                            assert(subpaths[i].m_path->length > 0);
-                            for(int j = current_pos; j < path->length; ++j)
+                            subpaths[i].m_join_pos = 0;
+                            subpaths[i].m_nucleotide = i;
+                            subpaths[i].m_length = current_pos - start_pos;
+                        }                
+                        else
+                        {                
+                            //log_printf("Creating path %i\n", i);
+                            pathStep join_step = db_graph_search_for_bubble(path, &current_step, &subpaths[i].m_path, graph);
+                            if(join_step.node != NULL)
                             {
-                                if(path->nodes[j] == join_step.node && path->orientations[j] == join_step.orientation)
+                                assert(subpaths[i].m_path != NULL);
+                                assert(subpaths[i].m_path->length > 0);
+                                for(int j = current_pos; j < path->length; ++j)
                                 {
-                                    polymorphism = true;                             
-                                    subpaths[i].m_nucleotide = i;
-                                    subpaths[i].m_join_pos = j;
-                                    subpaths[i].m_length = subpaths[i].m_path->length;
-                                    log_printf("Path %i has length %i\n", i, subpaths[i].m_length );  
-                                    break;
-                                }                   
+                                    if(path->nodes[j] == join_step.node && path->orientations[j] == join_step.orientation)
+                                    {
+                                        polymorphism = true;                             
+                                        subpaths[i].m_nucleotide = i;
+                                        subpaths[i].m_join_pos = j;
+                                        subpaths[i].m_length = subpaths[i].m_path->length;
+                                        //log_printf("Path %i has length %i\n", i, subpaths[i].m_length );      
+                                        break;
+                                    }                   
+                                }                                        
                             }
-                            
-                        }
-                        if(!polymorphism)
-                        {
-                            log_printf("Could not find join node.\n");
-                            if(subpaths[i].m_path)
+                            if(!polymorphism)
                             {
-                                path_destroy(subpaths[i].m_path);
-                                subpaths[i].m_path = NULL;
+                                log_printf("[write_paths_between_nodes] Warning: Found alternate path but could not find join node. Ignoring...\n");
+                                if(subpaths[i].m_path)
+                                {
+                                    path_destroy(subpaths[i].m_path);
+                                    subpaths[i].m_path = NULL;
+                                }
+                                subpaths[i].m_join_pos = -1;
+                                subpaths[i].m_length = -1;
                             }
-                            subpaths[i].m_join_pos = -1;
-                            subpaths[i].m_length = -1;
                         }
                     }
                 }
@@ -3280,47 +3296,48 @@ out_struct write_paths_between_nodes(  Path* path,
     
     if(fastg_recursion_level == 1)
     {
-        int start_pos_for_coverage = 0;
-        if(in_segments != NULL)
+        if(start_pos < path->length - 1)
         {
-            start_pos_for_coverage = start_pos;
-            if(skip_first)
+            int start_pos_for_coverage = 0;
+            if(in_segments != NULL)
             {
-                start_pos_for_coverage +=1;
+                start_pos_for_coverage = start_pos;
+                if(skip_first)
+                {
+                    start_pos_for_coverage +=1;
+                }
             }
+            int end_pos_for_coverage = start_pos_for_coverage == current_pos ? current_pos + 1 : current_pos;
+            assert(start_pos_for_coverage < end_pos_for_coverage);
+            path_get_statistics_between_points(&path_coverage_avg, &path_coverage_min, &path_coverage_max, path, start_pos_for_coverage, end_pos_for_coverage);
         }
-        int end_pos_for_coverage = start_pos_for_coverage == current_pos ? current_pos + 1 : current_pos;
-        assert(start_pos_for_coverage < end_pos_for_coverage);
-        path_get_statistics_between_points(&path_coverage_avg, &path_coverage_min, &path_coverage_max, path, start_pos_for_coverage, end_pos_for_coverage);
     }
     else
     {
         if(start_pos == 0)
         {
             // this is an "alt" route, so we want the coverage over the whole path
-            if(path->length > 1)
+            if(path->length > 2)
             {
                 int start_pos_for_coverage = skip_first ? 1 : 0;
-                path_get_statistics_between_points(&path_coverage_avg, &path_coverage_min, &path_coverage_max, path, start_pos_for_coverage, path->length);
-            }
-            else
-            {
-                path_coverage_avg = path->nodes[0]->coverage[0];
-                path_coverage_min = path->nodes[0]->coverage[0];
-                path_coverage_max = path->nodes[0]->coverage[0];
+                assert(start_pos_for_coverage < path->length - 1);
+                path_get_statistics_between_points(&path_coverage_avg, &path_coverage_min, &path_coverage_max, path, start_pos_for_coverage, path->length - 1);
             }
         }
         else
         {
             // this is a section of the main path.
-            int start_pos_for_coverage = start_pos;
-            if(skip_first && start_pos < end_pos)
+            if(start_pos < path->length - 1)
             {
-                start_pos_for_coverage += 1;
+                int start_pos_for_coverage = start_pos;
+                if(skip_first && start_pos < end_pos)
+                {
+                    start_pos_for_coverage += 1;
+                }
+                int end_pos_for_coverage = current_pos == end_pos ? end_pos + 1 : current_pos;
+                assert(start_pos_for_coverage < end_pos_for_coverage);
+                path_get_statistics_between_points(&path_coverage_avg, &path_coverage_min, &path_coverage_max, path, start_pos_for_coverage, end_pos_for_coverage);
             }
-            int end_pos_for_coverage = current_pos == end_pos ? end_pos + 1 : current_pos + 1;
-            assert(start_pos_for_coverage < end_pos_for_coverage);
-            path_get_statistics_between_points(&path_coverage_avg, &path_coverage_min, &path_coverage_max, path, start_pos_for_coverage, end_pos_for_coverage);
         }
     }
 
@@ -3381,7 +3398,7 @@ out_struct write_paths_between_nodes(  Path* path,
     
     if(!polymorphism)
     {
-        log_printf("No polymorphism\n");
+        //log_printf("No polymorphism\n");
         fastg_recursion_level--;
         for(int i = 0; i < 4; i++)
         {
@@ -3434,15 +3451,17 @@ out_struct write_paths_between_nodes(  Path* path,
         }
         qsort((void*)subpaths, 4, sizeof(subpath), compare);
                 
+/*
         for(int i = 0; i < 4; i++)
         {
             log_printf("Path %i of join pos %i, length %i\n", i, subpaths[i].m_join_pos, subpaths[i].m_length);
         }
+*/
 
         polymorphism_end_pos = subpaths[3].m_join_pos;                
         polymorphism_start_pos = current_pos;
 
-        log_printf("Found joining position %i, main path %i, current pos %i\n", polymorphism_end_pos, main_subpath, current_pos);
+        //log_printf("Found joining position %i, main path %i, current pos %i\n", polymorphism_end_pos, main_subpath, current_pos);
         assert(polymorphism_end_pos >= polymorphism_start_pos);
        
         if(fastg_recursion_level == 1)
@@ -3478,8 +3497,8 @@ out_struct write_paths_between_nodes(  Path* path,
         {
             if(subpaths[i].m_path && subpaths[i].m_join_pos >= 0)
             {
-                log_printf("------------------------------\n");
-                log_printf("Starting recursion for path %i\n", subpaths[i].m_nucleotide);
+                //log_printf("------------------------------\n");
+                //log_printf("Starting recursion for path %i\n", subpaths[i].m_nucleotide);
                 assert(subpaths[i].m_join_pos >= 0);
                 
                 //should these segments be the start of the next iteration?
@@ -3489,12 +3508,12 @@ out_struct write_paths_between_nodes(  Path* path,
                 gfa_segment_array* main_segments = NULL;
                 gfa_segment_array* alt_segments = NULL;
                             
-                log_printf("End pos: %i\n", main_end_pos);
+                //log_printf("End pos: %i\n", main_end_pos);
                 
                 // do the subpath            
                 if(main_end_pos >= 0)
                 {
-                    log_printf("Alt Path... length %i\n", subpaths[i].m_path->length);
+                    //log_printf("Alt Path... length %i\n", subpaths[i].m_path->length);
                     out_struct alt_out = write_paths_between_nodes(subpaths[i].m_path, 0, subpaths[i].m_length, graph, current_segment_array, true, file_gfa, file_fastg);
                     alt_segments = alt_out.m_segments;
                 }
@@ -3505,13 +3524,13 @@ out_struct write_paths_between_nodes(  Path* path,
                     int length = main_end_pos - main_start_pos;
                     if(length > 0)
                     {
-                        log_printf("Main Path...\n");
+                        //log_printf("Main Path...\n");
                         out_struct main_out = write_paths_between_nodes(path, main_start_pos, main_end_pos, graph, out_segments, true, file_gfa, file_fastg);
                         main_segments = main_out.m_segments;
                     }
                     else
                     {
-                        log_printf("Indel: no segment\n");
+                        //log_printf("Indel: no segment\n");
                         if(first_path)
                         {
                             main_segments = gfa_segment_array_new(1);
@@ -3616,4 +3635,122 @@ PathArray* path_split_at_min_coverages(Path* path, int min_coverage)
     }
     
     return pa;
+}
+
+void path_to_GFA_sequence(Path* path, gfa_file_wrapper* file_gfa, boolean include_first_kmer)
+{
+    assert(file_gfa != NULL);
+    long int string_length = path->length + 1;
+    short kmer_size = path->kmer_size;
+    int start = 0;
+    if(include_first_kmer)
+    {
+        string_length += kmer_size;
+    }
+    char sequence[string_length];
+    if(include_first_kmer)
+    {
+        BinaryKmer kmer;
+        char first_kmer_string[kmer_size + 1];
+        first_kmer_string[kmer_size] = '\0';
+        binary_kmer_assignment_operator(kmer, *element_get_kmer(path->nodes[0]));
+        if(path->orientations[0] == reverse)
+        {
+            BinaryKmer reverse_kmer;
+            binary_kmer_reverse_complement(&kmer, kmer_size, &reverse_kmer);
+            binary_kmer_to_seq(&reverse_kmer, kmer_size, first_kmer_string);
+        }
+        else
+        {
+            binary_kmer_to_seq(&kmer, kmer_size, first_kmer_string);
+        }
+        strncpy(sequence, first_kmer_string, kmer_size);
+        start += kmer_size;
+    }
+    
+    strcpy(sequence + start, path->seq);
+    sequence[string_length - 1] = '\0';
+    
+    uint32_t min_coverage;
+    uint32_t max_coverage;
+    double avg_coverage;
+    path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, path);
+    
+    fprintf(file_gfa->m_file, "S\tp%llds%i\t%lu\t%s\tCV:f:%f\n", 
+                    file_gfa->m_path_id,
+                    file_gfa->m_segment_count,
+                    string_length - 1, 
+                    sequence,
+                    avg_coverage);  
+}
+
+
+void write_path_GFA_nodes(Path* path, dBGraph* graph, gfa_file_wrapper* file_gfa)
+{
+    // write the path as a GFA2 sequence
+    path_to_GFA_sequence(path, file_gfa, true);
+    log_printf("[write_path_GFA_nodes] Writing GFA for sequence %s\n", path->seq);
+    
+    for(int i = 0; i < path->length; i++)
+    {
+        dBNode* current_node = path->nodes[i];
+        Orientation current_orientation = path->orientations[i];
+        int edges = db_node_edges_count(current_node, current_orientation);
+        if(edges > 1)
+        {
+            log_printf("[write_path_GFA_nodes] Found potential polymorphism\n");
+            // check every edge leaving this node
+            for(int e = 0; e < 4; e++)
+            {
+                if(db_node_edge_exist_any_colour(current_node, e, current_orientation))
+                {
+                    pathStep current_step;
+                    current_step.node = current_node;
+                    current_step.label = e;
+                    current_step.orientation = current_orientation;
+                    
+                    pathStep next_step, rev_step;
+                    db_graph_get_next_step(&current_step, &next_step, &rev_step, graph);
+                    if( next_step.node != path->nodes[i+1] && 
+                        element_get_coverage_all_colours(next_step.node) >= graph->path_coverage_minimum)
+                    {
+                        Path* alt_path = NULL;
+                        log_printf("[write_path_GFA_nodes] Looking for alternate route...\n");
+                        pathStep join_step = db_graph_search_for_bubble2(path, &current_step, &alt_path, graph);
+                        if(join_step.node != NULL)
+                        {
+                            int join_pos = i;
+                            for(int j = i; j < path->length; j++)
+                            {
+                                if(path->nodes[j] == join_step.node && path->orientations[j] == join_step.orientation)
+                                {
+                                    join_pos = j;
+                                    break;
+                                }
+                            }
+                            // write out GFA sequence
+                            assert(alt_path != NULL);
+                            file_gfa->m_segment_count++;
+                            path_to_GFA_sequence(alt_path, file_gfa, false);
+                            // write edge
+                            int main_start = i + graph->kmer_size;
+                            int main_end = join_pos + graph->kmer_size;
+                            fprintf(file_gfa->m_file, "E\tp%llds0_p%llds%i\tp%llds0+\tp%llds%i+\t%lu\t%lu\t0\t%lu$\t*\n",
+                                file_gfa->m_path_id, file_gfa->m_path_id, file_gfa->m_segment_count,
+                                file_gfa->m_path_id, file_gfa->m_path_id, file_gfa->m_segment_count,
+                                    main_start, main_end, alt_path->length);   
+                        }
+                        else
+                        {
+                            log_printf("[write_path_GFA_nodes] Could not find path...\n");
+                        }
+                        if(alt_path)
+                        {
+                            path_destroy(alt_path);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

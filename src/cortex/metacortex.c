@@ -448,6 +448,7 @@ int main(int argc, char **argv)
     }
 
     if (cmd_line.output_fasta) {
+        db_graph->path_coverage_minimum = cmd_line.path_coverage_minimum;
         switch (cmd_line.algorithm) {
             case PERFECT_PATH:
                 log_and_screen_printf("\nDumping supernodes: %s\n", cmd_line.output_fasta_filename);
@@ -485,9 +486,6 @@ int main(int argc, char **argv)
                     sprintf(cmd_line.output_fasta_filename, "%s.high_conf", temp);
                 }
 
-                // pass path_coverage_minimum value to dBgraph for use later
-                db_graph->path_coverage_minimum = cmd_line.path_coverage_minimum;
-
                 log_and_screen_printf("\nSearching graph for stats...\n");
                 find_subgraph_stats(db_graph, cmd_line.output_fasta_filename,
                   cmd_line.min_subgraph_size, cmd_line.min_contig_length,
@@ -506,8 +504,7 @@ int main(int argc, char **argv)
                 //metacortex_find_subgraphs(db_graph, cmd_line.output_fasta_filename, cmd_line.min_subgraph_size, cmd_line.min_contig_length, cmd_line.multiple_subgraph_contigs);
                 break;
             case SUBTRACTIVE_WALK:
-                 // pass path_coverage_minimum value to dBgraph for use later
-                db_graph->path_coverage_minimum = cmd_line.path_coverage_minimum;
+
                 log_and_screen_printf("\nPerforming iterative subtractive walk..\n");       
                 subtractive_walk(db_graph, cmd_line.output_fasta_filename, cmd_line.min_contig_length, cmd_line.delta_coverage);
                 break;

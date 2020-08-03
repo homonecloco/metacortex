@@ -1292,10 +1292,8 @@ Nucleotide db_graph_get_best_next_step_nucleotide(dBNode * from, dBNode * previo
     return best;
 }
 
-pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_graph)
-{
-    //log_printf("[get_path_to_junction] Starting get_path_to_junction.\n");
-   
+pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_graph, Queue* node_queue)
+{ 
     // don't add first step
     pathStep return_step;
     return_step.node = NULL;
@@ -1321,6 +1319,7 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
                 break;
             }
             flags_action_set_flag(VISITED_FORWARD, &current_node->flags);
+            queue_push(node_queue, current_node);
         }
         else
         {
@@ -1334,6 +1333,7 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
                 break;
             }
             flags_action_set_flag(VISITED_REVERSE, &current_node->flags);
+            queue_push(node_queue, current_node);
         }
         
                 
@@ -1382,19 +1382,13 @@ pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_
     path_add_node(&return_step, new_path);
     
     // mark as visited
-    if(current_orientation == forward)
-    {
-        flags_action_set_flag(VISITED_FORWARD, &current_node->flags);
-    }
-    else
-    {
-        flags_action_set_flag(VISITED_REVERSE, &current_node->flags);
-    }
+    db_node_action_set_flag_visited_with_orientation(current_node, current_orientation);
+    queue_push(node_queue, current_node);
     
     return return_step;
 }
 
-#define BUBBLE_QUEUE_SIZE 20000000 // 10000000
+#define BUBBLE_QUEUE_SIZE 200000 // 10000000
 #define MAX_EXPLORE_BUBBLE_LENGTH 2000000
 #define MAX_EXPLORE_BUBBLE_JUNCTIONS 2000
 // breadth first search
@@ -1453,7 +1447,6 @@ pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path
             mark = true;
         }
     }
-    assert(mark);
     
     // function to walk perfect path from node/orientation/n
     // adds node at end of path to queue if unvisited
@@ -1655,11 +1648,8 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     uint32_t max_coverage;
     path_get_statistics(&avg_coverage, &min_coverage, &max_coverage, main_path);
     
-    int max_path_size = main_path->length * 10;
-    int max_path_array_total_size = max_path_size * 100;
+    int max_path_size = main_path->length;
     
-    // Clear the graph of VISITED_FORWARD/REVERSE flags
-    hash_table_traverse_no_progress_bar(&db_node_action_unset_flag_visited_forward_reverse, db_graph);
     // mark the path
     for(int i = 0; i < main_path->length; i++)
     {
@@ -1674,8 +1664,9 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     }
     
     // setup array etc.
-    PathArray* path_array = path_array_new(10);
+    PathArray* path_array = path_array_new(2);
     Queue* step_queue = queue_new(200000, sizeof(pathStep*));
+    Queue* node_queue_for_flags = node_queue_new(BUBBLE_QUEUE_SIZE);
     
     // This step is freed once it has been popped
     pathStep* new_step = malloc(sizeof(pathStep));
@@ -1687,23 +1678,13 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     new_step->path = first_step->path;
     
     queue_push_step(step_queue, new_step);
-    min_coverage = (int)(avg_coverage * 0.5  > 1 ? avg_coverage * 0.5 : 1);
     
     // the step to return
     pathStep join_step;
     join_step.node = NULL;
     join_step.orientation = undefined;
     join_step.label = undefined;
-    
-    //check coverage:
-    Orientation next_orientation;
-    Nucleotide reverse_edge;
-    dBNode* next_node = db_graph_get_next_node(new_step->node, new_step->orientation, &next_orientation, new_step->label, &reverse_edge, db_graph);
-    if(element_get_coverage_all_colours(next_node) < min_coverage)
-    {
-        return join_step;
-    }
-    
+       
     boolean joined_path = false;
     boolean add_first_step = true;
     
@@ -1713,6 +1694,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
 
         // Remove paths from array that don't join this one. This is a depth first search
         // so we will get back to the path that ended in the node in next_step eventually.
+        boolean removed = false;
         while(path_array->number_of_paths > 0)
         {
             Path* last_path = path_array_get_last_path(path_array);
@@ -1724,7 +1706,14 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
             else
             {
                 path_array_remove_last_path(path_array);
+                removed = true;
             }
+        }
+        
+        if(path_array->number_of_paths == 0 && removed)
+        {
+            // we removed all the paths from the array!
+            assert(false);
         }
        
         Path* new_path = path_new(max_path_size, db_graph->kmer_size);
@@ -1733,17 +1722,20 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
             path_add_node(first_step, new_path);
             add_first_step = false;
         }
-        pathStep junction_step = get_path_to_junction(next_step, new_path, db_graph);
-        if(junction_step.node == NULL || path_array_get_total_size(path_array) + new_path->length > max_path_array_total_size)
+        pathStep junction_step = get_path_to_junction(next_step, new_path, db_graph, node_queue_for_flags);
+        if(junction_step.node == NULL)
         {
-            if(path_array_get_total_size(path_array) + new_path->length > max_path_array_total_size)
-            {
-                log_printf("[db_graph_search_for_bubble] Maximum path array total length reached.\n");
-            }
             // found dead end or revisited node. Go back to top of loop.
             path_destroy(new_path);
-            free(next_step);
+            free(next_step); 
             continue;
+        }
+        if(path_array_get_total_size(path_array) + new_path->length > max_path_size)
+        {
+            log_printf("[db_graph_search_for_bubble] Warning: Maximum path array total length reached. Ending search for alternative route.\n");
+            path_destroy(new_path);
+            free(next_step);
+            break;
         }
         
         dBNode* junction_node = junction_step.node;
@@ -1762,6 +1754,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
             break;
         }
        
+        // Otherwise order the edges by coverage and add them to the queue (actually a stack) to be explored
         int num_edges = db_node_edges_count_all_colours(junction_node, junction_orientation);
         assert(num_edges > 1);
 
@@ -1773,9 +1766,10 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
             bcp_array[base].coverage = 0;
             if(db_node_edge_exist_any_colour(junction_node, base, junction_orientation))
             {
-                next_node = db_graph_get_next_node(junction_node, junction_orientation, &next_orientation, base, &reverse_edge, db_graph);
-                if((next_orientation == forward && flags_check_for_flag(VISITED_FORWARD, &(next_node->flags))) || 
-                   (next_orientation == reverse && flags_check_for_flag(VISITED_REVERSE, &(next_node->flags))) )
+                Orientation next_orientation;
+                Nucleotide reverse_edge;
+                dBNode* next_node = db_graph_get_next_node(junction_node, junction_orientation, &next_orientation, base, &reverse_edge, db_graph);
+                if(db_node_check_flag_visited_with_orientation(next_node, next_orientation))
                 {
                     continue;
                 }
@@ -1794,7 +1788,7 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
         boolean added = false;
         for(int i = 0; i < 4; i++) 
         {
-            if(bcp_array[i].coverage >= min_coverage)
+            if(bcp_array[i].coverage >= db_graph->path_coverage_minimum)
             {
                 Nucleotide base = bcp_array[i].base;
 
@@ -1824,37 +1818,51 @@ pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path*
     if(joined_path)
     {
         Path* alt_path = path_array_merge_to_path(path_array, false, db_graph);
-        log_printf("[db_graph_search_for_bubble] Found alternative path.\n");
-        int end = -1;
-        for(int i = alt_path->length - 1; i >= 0; i--)
+        if(alt_path)
         {
-            if((alt_path->orientations[i] == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(alt_path->nodes[i]->flags))) ||
-               (alt_path->orientations[i] == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(alt_path->nodes[i]->flags))) )
+            int end = -1;
+            for(int i = alt_path->length - 1; i >= 0; i--)
             {
-                end = i;
-                break;
+                if((alt_path->orientations[i] == forward && flags_check_for_flag(CURRENT_PATH_FORWARD, &(alt_path->nodes[i]->flags))) ||
+                   (alt_path->orientations[i] == reverse && flags_check_for_flag(CURRENT_PATH_REVERSE, &(alt_path->nodes[i]->flags))) )
+                {
+                    end = i;
+                    break;
+                }
             }
+
+            if(end > 0)
+            {
+                Path* new_path = path_new(end, alt_path->kmer_size);
+
+                path_copy_subpath(new_path, alt_path, 0, end);
+
+                join_step.node = alt_path->nodes[end];
+                join_step.orientation = alt_path->orientations[end];            
+
+                 *new_path_ptr = new_path;
+
+                 assert(join_step.node != NULL);
+            }
+            else
+            {
+                log_printf("[db_graph_search_for_bubble] Warning: Found alternative path but could not find join. Ignoring...\n");
+            }
+            path_destroy(alt_path);
         }
-        
-        if(end > 0)
-        {
-            Path* new_path = path_new(end, alt_path->kmer_size);
-
-            path_copy_subpath(new_path, alt_path, 0, end);
-
-            join_step.node = alt_path->nodes[end];
-            join_step.orientation = alt_path->orientations[end];            
-
-             *new_path_ptr = new_path;
-             
-             assert(join_step.node != NULL);
-        }
-        path_destroy(alt_path);
     }
     
     // free used memory
     path_array_destroy(path_array);
     queue_free(step_queue);
+    
+    // unmark the VISITED_FORWARD/REVERSE
+    while(node_queue_for_flags->number_of_items > 0) 
+    {
+        dBNode* queue_node = (dBNode*)queue_pop(node_queue_for_flags);
+        db_node_action_unset_flag_visited_forward_reverse(queue_node);
+    }
+    queue_free(node_queue_for_flags);
     
     // unmark the path
     for(int i = 0; i < main_path->length; i++)

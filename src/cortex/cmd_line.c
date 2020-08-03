@@ -517,7 +517,7 @@ CmdLine parse_cmdline(int argc, char *argv[], int unit_size)
                 }
                 else{
                   cmd_line.path_coverage_minimum = atoi(optarg);
-                }
+                }               
                 cmd_line.high_confidence=true;
                 break;
 
