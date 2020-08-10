@@ -276,6 +276,11 @@ long long load_fastq_from_filename_into_graph(char *filename, short colour,
     loaded_kmers = load_seq_into_db_graph(&fra);
     printf("Loaded %'lld kmers (bad reads %'lld)\n", loaded_kmers, fra.bad_reads);
     hash_table_print_stats(db_graph);
+    if (hash_table_percentage_occupied(db_graph) >= fra.maximum_ocupancy) 
+    {
+         log_and_screen_printf("\nWARNING: Max occupancy of hash table was reached. Some kmers may be missing. "
+                                        "Consider re-running with increased hash table size.\n");
+    }
     return loaded_kmers;
 }
 
@@ -346,6 +351,11 @@ long long load_fasta_from_filename_into_graph(char *filename, short colour,
     loaded_kmers = load_seq_into_db_graph(&fra);
     printf("Loaded %'lld kmers (bad reads %'lld)\n", loaded_kmers, fra.bad_reads);
     hash_table_print_stats(db_graph);
+    if (hash_table_percentage_occupied(db_graph) >= fra.maximum_ocupancy) 
+    {
+         log_and_screen_printf("\nWARNING: Max occupancy of hash table was reached. Some kmers may be missing. "
+                                        "Consider re-running with increased hash table size.\n");
+    }
     return loaded_kmers;
 }
 
