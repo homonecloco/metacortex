@@ -36,11 +36,11 @@
 #include "logger.h"
 #include "graph_tools.h"
 #include "graph_formats.h"
-#include "node_queue.h"
 #include "coverage_walk.h"
 #include "perfect_path.h"
 #include "metagraphs.h"
 #include "cleaning.h"
+#include "metacortex.h"
 
 /*----------------------------------------------------------------------*
  * Function:                                                            *
@@ -48,7 +48,7 @@
  * Params:                                                              *
  * Returns:                                                             *
  *----------------------------------------------------------------------*/
-int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue)
+int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue, int max_search_size)
 {
     Queue* nodes_to_walk;
     dBNode* node;
@@ -58,7 +58,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
     int best_coverage = 0;
     int best_edges = 0;
 
-    *best_node = 0;
+    *best_node = 0;  
 
     // Nucleotide iterator, used to walk all possible paths from a node
     void walk_if_exists(Nucleotide n) {
@@ -114,7 +114,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
                 for (i=0; i<new_path->length; i++) {
                     //  MARTIN : new_path established where?
                     if (!db_node_check_flag_visited(new_path->nodes[i])) {
-                        int this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
+                        uint32_t this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
                         int this_edges = db_node_edges_count_all_colours(new_path->nodes[i], forward) + db_node_edges_count_all_colours(new_path->nodes[i], reverse);
 
                         if ((best_node == 0) ||
@@ -140,7 +140,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
 
     // Start a queue of nodes to walk
     //log_and_screen_printf("Allocating %d Mb to store queue information (max %d nodes, when full each node could be %d)...\n", ((METACORTEX_QUEUE_SIZE * sizeof(QueueItem*)) / 1024) / 1024, METACORTEX_QUEUE_SIZE, sizeof(QueueItem));
-    nodes_to_walk = queue_new(METACORTEX_QUEUE_SIZE);
+    nodes_to_walk = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!nodes_to_walk) {
         log_and_screen_printf("Couldn't get memory for node queue.\n");
         exit(-1);
@@ -158,7 +158,8 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
     }
 
     // Now keep visiting nodes and walking paths
-    while (nodes_to_walk->number_of_items > 0) {
+    int i = 0;
+    while (nodes_to_walk->number_of_items > 0 && i < max_search_size) {
         // Take top node from list
         node = queue_pop_node(nodes_to_walk, &depth);
 
@@ -167,6 +168,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
         nucleotide_iterator(&walk_if_exists);
         orientation = reverse;
         nucleotide_iterator(&walk_if_exists);
+        i++;
     }
 
     queue_free(nodes_to_walk);
@@ -180,21 +182,26 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph,
     return current_graph_size;
 }
 
-void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, boolean multiple_subgraph_contigs)
+void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, 
+                                boolean multiple_subgraph_contigs, boolean gfa_fastg_output)
 {
     FILE* fp_analysis;
     FILE* fp_contigs;
+    FILE* fp_contigs_fastg;
+    FILE* fp_contigs_gfa;
     Queue* graph_queue;
-    Path *path_fwd = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
-    Path *path_rev = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
+    //Path *path_fwd = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
+    //Path *path_rev = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
     Path *final_path = path_new(MAX_EXPLORE_PATH_LENGTH, graph->kmer_size);
     char seq[256];
     char analysis_filename[256];
+    char gfa_filename[256];
+    char fastg_filename[256];
     long int total_nodes = 0;
     int n_seeds = 0;
     int counter= 0;
 
-    graph_queue = queue_new(METACORTEX_QUEUE_SIZE);
+    graph_queue = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!graph_queue) {
         log_and_screen_printf("Couldn't get memory for graph queue.\n");
         exit(-1);
@@ -223,6 +230,29 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
         log_and_screen_printf("ERROR: Can't open contig file.\n");
         exit(-1);
     }
+    
+    remove_file_extension(consensus_contigs_filename);
+    /* Open fastg contigs file */
+    if(gfa_fastg_output)
+    {
+        sprintf(fastg_filename, "%s.fastg", consensus_contigs_filename);
+        fp_contigs_fastg = fopen(fastg_filename, "w");
+        if (!fp_contigs_fastg) {
+            log_and_screen_printf("ERROR: Can't open contig (fastg) file.\n%s\n", fastg_filename);
+            exit(-1);
+        }
+        // write the header
+        fprintf(fp_contigs_fastg, "#FASTG:begin;");
+        fprintf(fp_contigs_fastg, "\n#FASTG:version=1.0:assembly_name=\"%s\";", consensus_contigs_filename);
+
+        /* Open gfa contigs file */
+        sprintf(gfa_filename, "%s.gfa", consensus_contigs_filename);
+        fp_contigs_gfa = fopen(gfa_filename, "w");
+        if (!fp_contigs_gfa) {
+            log_and_screen_printf("ERROR: Can't open contig (gfa) file.\n%s\n", gfa_filename);
+            exit(-1);
+        }
+    }
 
     /* For each node, if it's not pruned or visited, try and grow a graph */
     void explore_node(dBNode * node) {
@@ -230,15 +260,15 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
             log_and_screen_printf("Error: NULL node passed to explore_node.\n");
             exit(-1);
         }
-
-        if (db_node_check_for_any_flag(node, PRUNED | VISITED) == false) {
+        uint32_t coverage = element_get_coverage_all_colours(node);
+        if (db_node_check_for_any_flag(node, PRUNED | VISITED) == false && coverage > graph->path_coverage_minimum) {
             dBNode* seed_node;
             int nodes_in_graph;
 
             /* Grow graph from this node, returning the 'best' (highest coverage) node to store as seed point */
             log_printf("Growing graph from node\n");
             graph_queue->number_of_items = 0;
-            nodes_in_graph = grow_graph_from_node(node, &seed_node, graph, graph_queue);
+            nodes_in_graph = grow_graph_from_node(node, &seed_node, graph, graph_queue, MAX_EXPLORE_BRANCHES);
             total_nodes += nodes_in_graph;
 
             if (seed_node == NULL) {
@@ -256,15 +286,20 @@ void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename,
                     int pi;
 
                     binary_kmer_to_seq(&(seed_node->kmer), graph->kmer_size, seq);
-                    coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd);
-                    coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev);
-                    path_reverse(path_fwd, final_path);
-                    path_append(final_path, path_rev);
+                    coverage_walk_get_path(seed_node, forward, NULL, graph, final_path, true);
+                    //coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd, true);
+                    //coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev, true);
+                    //path_reverse(path_fwd, final_path);
+                    //path_append(final_path, path_rev);
                     final_path->id = counter;
                     if (final_path->length >= (min_contig_length - graph->kmer_size)) {
                         log_printf("Write path of size %d\n", final_path->length);
                         log_printf("graph size\t%i\n",nodes_in_graph);
-                        path_to_fastg_gfa(final_path, fp_contigs, NULL, graph);
+                        path_to_fasta(final_path, fp_contigs);
+                        if(gfa_fastg_output)
+                        {
+                            path_to_gfa2_and_fastg(final_path, graph, fp_contigs_gfa, fp_contigs_fastg);
+                        }
                     } else {
                         log_printf("Didn't write path of size %d\n", final_path->length);
                     }
@@ -291,9 +326,8 @@ AND AFTER IT ON CURRENT PATH
                     }
 
                     /* Reset paths */
-                    path_reset(path_fwd);
-                    //perfect_path_get_path(seed_node, forward, &db_node_action_do_nothing, graph, path_fwd);
-                    path_reset(path_rev);
+                    //path_reset(path_fwd);
+                    //path_reset(path_rev);
                     path_reset(final_path);
                 } else {
                     log_printf("  Number of nodes (%i) too small. Not outputting contig.\n", nodes_in_graph);
@@ -313,4 +347,13 @@ AND AFTER IT ON CURRENT PATH
     /* Close files */
     fclose(fp_contigs);
     fclose(fp_analysis);
+    
+    // write the fastg footer
+    if(gfa_fastg_output)
+    {
+        fprintf(fp_contigs_fastg, "\n#FASTG:end;");
+        fclose(fp_contigs_fastg);
+        fclose(fp_contigs_gfa);
+    }
+    
 }

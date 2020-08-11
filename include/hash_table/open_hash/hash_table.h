@@ -110,6 +110,9 @@ boolean hash_table_apply_or_insert(Key key, void(*f)(Element*), HashTable *);
 //applies f to every element of the table
 void hash_table_traverse(void(*f)(Element *), HashTable *);
 
+//as above but does not write a progress bar to std out.
+void hash_table_traverse_no_progress_bar(void (*f)(Element *),HashTable * );
+
 //applies f to every element of the table, we can pass arguments to the option. The array is designed for
 //the multithreaded version, only the first element in the array of arguments is used. The signature
 //compatibility is designed to facilitate the adoption of multithreading.

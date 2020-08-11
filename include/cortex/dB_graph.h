@@ -62,6 +62,7 @@
 #include <stdio.h>
 #include <structs.h>
 #include <path.h>
+#include <node_queue.h>
 
 typedef HashTable dBGraph;
 
@@ -281,5 +282,10 @@ void db_graph_reset_flags(dBGraph * db_graph);
 Nucleotide db_graph_get_best_next_step_nucleotide(dBNode * from, dBNode * previous,  Orientation orientation, dBGraph * db_graph );
 
 void db_graph_calculate_stats(dBGraph * db_graph);
+
+pathStep db_graph_search_for_bubble(Path* main_path, pathStep* first_step, Path** new_path_ptr, dBGraph * db_graph);
+pathStep db_graph_search_for_bubble2(Path* main_path, pathStep* first_step, Path** new_path_ptr, dBGraph * db_graph);
+pathStep get_path_to_junction(pathStep* first_step, Path* new_path, dBGraph* db_graph, Queue* node_queue);
+
 
 #endif /* DB_GRAPH_H_ */

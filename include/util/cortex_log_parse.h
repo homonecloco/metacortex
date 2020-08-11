@@ -10,7 +10,8 @@
  *                                                                      *
  * History: 06-Apr-11: RML: Created                                     *
  *----------------------------------------------------------------------*/
-
+#ifndef CORTEX_LOG_PARSE_H
+#define CORTEX_LOG_PARSE_H
 /*----------------------------------------------------------------------*
  * Error codes                                                          *
  *----------------------------------------------------------------------*/
@@ -137,3 +138,4 @@ typedef struct {
 int parse_cortex_log(char* filename, CortexLog* cl);
 void print_cortex_log(CortexLog* cl);
 
+#endif //CORTEX_LOG_PARSE_H

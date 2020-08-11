@@ -86,42 +86,42 @@
 typedef uint32_t Flags;
 
 //Block of flags for the element
-#define  VISITED_A  		  (1 <<  0) //x0000 0001
-#define  VISITED_C  		  (1 <<  1) //x0000 0002
-#define  VISITED_G  		  (1 <<  2) //x0000 0004
-#define  VISITED_T  		  (1 <<  3) //x0000 0008
-#define  EDGES_FLAGS		  (VISITED_A 	| VISITED_C 	| VISITED_G 	| VISITED_T)     //x0000 000F
-#define  VISITED_REV_A  	  (1 <<  4) //x0000 0010
-#define  VISITED_REV_C  	  (1 <<  5) //x0000 0020
-#define  VISITED_REV_G  	  (1 <<  6) //x0000 0040
-#define  VISITED_REV_T        (1 <<  7) //x0000 0080
-#define  EDGES_REV_FLAGS	  (VISITED_REV_A | VISITED_REV_C | VISITED_REV_G | VISITED_REV_T) //x0000 00F0
-#define  VISITED_FORWARD  	  (1 <<  8) //x0000 0100
-#define  VISITED_REVERSE  	  (1 <<  9) //x0000 0200
-#define  CURRENT_PATH_FORWARD (1 << 10) //x0000 0400
-#define  CURRENT_PATH_REVERSE (1 << 11) //x0000 0800
-#define  END_NODE_FORWARD  	  (1 << 12) //x0000 1000
-#define  END_NODE_REVERSE  	  (1 << 13) //x0000 2000
-#define  BRANCH_NODE_FORWARD  (1 << 14) //x0000 4000
-#define  BRANCH_NODE_REVERSE  (1 << 15) //x0000 8000
-#define  PLAIN_NODE 		  (1 << 16) //x0001 0000
-#define  PRINT_FORWARD 		  (1 << 17) //x0002 0000
-#define  PRINT_REVERSE 		  (1 << 18) //x0004 0000
-#define  STARTING_FORWARD	  (1 << 19) //x0008 0000
-#define  TIP_START            (1 << 20) //x0010 0000
-#define  IGNORE_START_NODE	  (1 << 21) //x0020 0000
-#define  X_NODE			 	  (1 << 22) //x0040 0000
-#define  VISITED			  (1 << 23) //x0080 0000
-#define  PRUNED				  (1 << 24) //x0100 0000
-#define  ASSIGNED			  (1 << 25) //x0200 0000
-#define  Y_START			  (1 << 26) //x0400 0000
+#define  VISITED_A                  (1 <<  0) //x0000 0001
+#define  VISITED_C                  (1 <<  1) //x0000 0002
+#define  VISITED_G                  (1 <<  2) //x0000 0004
+#define  VISITED_T                  (1 <<  3) //x0000 0008
+#define  EDGES_FLAGS                (VISITED_A 	| VISITED_C 	| VISITED_G 	| VISITED_T)     //x0000 000F
+#define  VISITED_REV_A              (1 <<  4) //x0000 0010
+#define  VISITED_REV_C              (1 <<  5) //x0000 0020
+#define  VISITED_REV_G              (1 <<  6) //x0000 0040
+#define  VISITED_REV_T              (1 <<  7) //x0000 0080
+#define  EDGES_REV_FLAGS            (VISITED_REV_A | VISITED_REV_C | VISITED_REV_G | VISITED_REV_T) //x0000 00F0
+#define  VISITED_FORWARD            (1 <<  8) //x0000 0100
+#define  VISITED_REVERSE            (1 <<  9) //x0000 0200
+#define  CURRENT_PATH_FORWARD       (1 << 10) //x0000 0400
+#define  CURRENT_PATH_REVERSE       (1 << 11) //x0000 0800
+#define  END_NODE_FORWARD           (1 << 12) //x0000 1000
+#define  END_NODE_REVERSE           (1 << 13) //x0000 2000
+#define  BRANCH_NODE_FORWARD        (1 << 14) //x0000 4000
+#define  BRANCH_NODE_REVERSE        (1 << 15) //x0000 8000
+#define  PLAIN_NODE                 (1 << 16) //x0001 0000
+#define  PRINT_FORWARD              (1 << 17) //x0002 0000
+#define  PRINT_REVERSE              (1 << 18) //x0004 0000
+#define  STARTING_FORWARD           (1 << 19) //x0008 0000
+#define  TIP_START                  (1 << 20) //x0010 0000
+#define  IGNORE_START_NODE          (1 << 21) //x0020 0000
+#define  X_NODE                     (1 << 22) //x0040 0000
+#define  VISITED                    (1 << 23) //x0080 0000
+#define  PRUNED                     (1 << 24) //x0100 0000
+#define  ASSIGNED                   (1 << 25) //x0200 0000
+#define  Y_START                    (1 << 26) //x0400 0000
 
 #else
 typedef uint16_t Flags;
 #define  ASSIGNED			  (1 << 0)  //x0001
 #define  VISITED			  (1 << 1)  //x0002
-#define  PRUNED				  (1 << 2)  //x0003
-#define  BRANCH_NODE_FORWARD  (1 << 3)  //x0004
+#define  PRUNED				  (1 << 2)  //x0004
+#define  BRANCH_NODE_FORWARD  (1 << 3)  //x0008
 #define  BRANCH_NODE_REVERSE  (1 << 4)  //x0010
 #define  X_NODE			 	  (1 << 5)  //x0020
 #define  END_NODE_FORWARD  	  (1 << 6)  //x0040

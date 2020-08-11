@@ -60,6 +60,7 @@
  ************************************************************************/
 
 #include <open_hash/hash_table.h>
+#include "gfa_segment.h"
 
 #ifndef PATH_H_
 #define PATH_H_
@@ -117,6 +118,8 @@
 #define PRINT_LABEL_AS_N       (1 <<  4) //x0000 0010
 #define PRINT_LABEL_LOWERCASE  (1 <<  5) //x0000 0020
 
+#define MAX_GFA_RECURSIONS 1
+
 
 typedef enum  {NONE = 0,  FIRST = 1, LAST = 2 }PathEnd ;
 
@@ -146,6 +149,8 @@ typedef struct {
 
     Flags stop_reasons_first;
     Flags stop_reasons_last;
+    
+    short subpath_id;
 
 } Path;
 
@@ -217,9 +222,13 @@ void path_destroy(Path * path);
 
 void path_copy(Path * to, Path * from);
 
+boolean path_copy_subpath(Path* dest_path, const Path* source_path, int start, int end);
+
 void path_increase_id(Path * path);
 
 void path_to_fasta(Path * path, FILE * fout);
+
+void path_to_fasta_with_statistics(Path * path, FILE * fout, double avg_coverage, uint32_t min_coverage, uint32_t max_coverage);
 
 void path_to_fastg_gfa(Path * path, FILE * fout, FILE * fout2, HashTable* graph);
 
@@ -227,7 +236,7 @@ void path_to_fasta_debug(Path * path, FILE * fout);
 
 void path_to_fasta_colour(Path * path, FILE * fout, char * id);
 
-void path_get_statistics(double * avg_coverage, int * min_coverage, int * max_coverage, Path * path);
+void path_get_statistics(double * avg_coverage, uint32_t * min_coverage, uint32_t * max_coverage, Path * path);
 
 int path_get_nodes_count(Path * path);
 
@@ -266,6 +275,8 @@ pathStep * path_get_last_step(pathStep * ps, Path * path);
 int path_index_of_step(pathStep * step, Path * path);
 
 int path_get_length(Path * path);
+
+PathArray * path_split_at_min_coverages(Path * p, int min_coverage);
 
 PathArray * path_split_in_perfect_paths(Path * p);
 
@@ -308,7 +319,11 @@ void path_inner_iterator(void (*step_action) (pathStep * step), Path * path);
 
 int path_step_compare(pathStep * a, pathStep * b);
 
-void path_get_statistics(double *avg_coverage, int *min_coverage, int *max_coverage, Path * path);
+void path_get_statistics_between_points(double *avg_coverage, uint32_t *min_coverage, uint32_t *max_coverage, Path * path, int start, int end);
+
+void path_get_statistics(double *avg_coverage, uint32_t *min_coverage, uint32_t *max_coverage, Path * path);
+
+void path_get_coverage_standard_deviation(double* standard_deviation, double avg_coverage, Path* path);
 
 boolean path_is_empty(Path * path);
 
@@ -395,11 +410,19 @@ boolean path_array_add_path(Path * p, PathArray *pa);
 
 void path_array_merge(PathArray ** from, PathArray * to);
 
+Path* path_array_merge_to_path(PathArray* pa, boolean reverse_array_order, HashTable* db_graph);
+
+Path* path_array_get_last_path(PathArray* pa);
+
+void path_array_remove_last_path(PathArray* pa);
+
 Path * path_array_get(int path, PathArray *pa);
 //Buffer functions
 void path_array_initialise_buffers(short kmer_size);
 
 void path_array_to_fasta(FILE * f, PathArray * pa);
+
+int path_array_get_total_size(PathArray* pa);
 
 /**
  * This assumes that the program is always using the same kmer size!
@@ -421,6 +444,11 @@ boolean is_step_marked_as_uncertain(int i, Path * path);
 
 void path_mark_as_visited(Path* path);
 
+void path_mark_path_with_flag(Path* path, Flags f);
+
+void path_unmark_path_with_flag(Path* path, Flags f);
+
+
 void path_pairs_to_fasta(PathArray* pa, int distances[], FILE* fout);
 
 void * initalise_gfa_stats(gfa_stats * gfa, int max_length);
@@ -434,5 +462,29 @@ void output_L_line(FILE * f, gfa_stats * gfa);
 void post_polymorph_L_lines(FILE * f, gfa_stats * gfa);
 
 void add_to_P_line(gfa_stats * gfa);
+
+void write_fastg_alt(const char* sequence1, const char* sequence2, FILE* file_fastg);
+
+typedef struct
+{
+    int m_new_start_pos;
+    boolean m_skip_first;
+    gfa_segment_array* m_segments;
+}   out_struct;
+
+out_struct write_paths_between_nodes(Path* path, int start_pos, int end_pos, HashTable* graph, gfa_segment_array* in_segments, boolean skip_first, gfa_file_wrapper* file_gfa, FILE* file_fastg);
+
+void path_to_gfa2_and_fastg(Path* path, HashTable* graph, FILE* file_gfa, FILE* file_fastg);
+
+int fastg_recursion_level;
+
+typedef struct
+{
+    int m_join_pos;
+    int m_length;
+    Nucleotide m_nucleotide;
+    Path* m_path;
+}   subpath;
+
 
 #endif /* PATH_H_ */

@@ -62,15 +62,14 @@
  * are prefixed with element_
  * The de Bruijn based routines are prefixed with db_node
  ************************************************************************/
+#ifndef ELEMENT_H_
+#define ELEMENT_H_
 
 #include <global.h>
 #include <nucleotide.h>
 #include <seq.h>
 #include <binary_kmer.h>
 #include <flags.h>
-
-#ifndef ELEMENT_H_
-#define ELEMENT_H_
 
 #ifndef NUMBER_OF_COLOURS
 #define NUMBER_OF_COLOURS 1
@@ -110,11 +109,11 @@ void element_initialise(Element *, BinaryKmer* kmer, short kmer_size);
 BinaryKmer* element_get_kmer(Element *);
 
 //int element_get_coverage(Element *);
-int element_get_coverage_all_colours(Element *);
+uint32_t element_get_coverage_all_colours(Element *);
 
-int element_get_coverage_by_colour(Element *, short);
+uint32_t element_get_coverage_by_colour(Element *, short);
 
-int element_update_coverage(Element *, short, int);
+uint32_t element_update_coverage(Element *, short, int);
 
 boolean db_node_check_for_flag_ALL_OFF(dBNode * node);
 
@@ -202,6 +201,7 @@ void db_node_action_set_flag_pruned(dBNode * node);
 
 void db_node_action_set_flag_visited(dBNode * node);
 
+
 long long int get_visited_count(void);
 
 void clear_visited_count(void);
@@ -220,7 +220,11 @@ void db_node_action_unset_current_path(dBNode * node, Orientation o);
 
 boolean db_node_action_is_in_current_path(dBNode * node, Orientation o);
 
-void db_node_action_unset_flag_current_path(dBNode * no);
+void db_node_action_unset_flag_current_path(dBNode * node);
+
+void db_node_action_unset_flag_visited(dBNode* node);
+
+void db_node_action_unset_flag_visited_forward_reverse(dBNode* node);
 
 boolean db_node_check_flag_visited(dBNode * node) ;
 
@@ -266,5 +270,9 @@ void db_node_action_set_flag_none(dBNode * node);
 boolean elemet_is_assigned(Element * node);
 
 boolean element_check_for_flag(Element * node, Flags flag);
+
+boolean db_node_check_flag_visited_with_orientation(dBNode * node, Orientation orientation);
+
+void db_node_action_set_flag_visited_with_orientation(dBNode * node, Orientation orientation);
 
 #endif /* ELEMENT_H_ */

@@ -58,6 +58,8 @@
 /************************************************************************
  * bubble_find.h
  ************************************************************************/
+#ifndef BUBBLE_FIND_H
+#define BUBBLE_FIND_H
 
 void db_graph_identify_branches(int max_length, dBGraph * db_graph);
 
@@ -77,3 +79,5 @@ void db_graph_prepare_output_files(char * filename);
 int db_graph_output_search_paths(char * filename, PathArray * patharray);
 
 char * db_graph_generate_colour_stats_string(Path * p, Path * prefix, Path * suffix, char * type);
+
+#endif // BUBBLE_FIND_H

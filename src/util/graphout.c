@@ -584,7 +584,7 @@ int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph)
     }
     
     // Start a queue of nodes to walk
-    nodes_to_walk = queue_new(ANALYSIS_QUEUE_SIZE);
+    nodes_to_walk = node_queue_new(ANALYSIS_QUEUE_SIZE);
     if (!nodes_to_walk) {
         log_and_screen_printf("Couldn't get memory for node queue.\n");
         exit(1);

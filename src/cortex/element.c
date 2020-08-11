@@ -119,18 +119,18 @@ BinaryKmer *element_get_kmer(Element * e)
 //      return e->coverage;
 //}
 
-int element_get_coverage_all_colours(Element * e)
+uint32_t element_get_coverage_all_colours(Element * e)
 {
-    int coverage = 0;
+    uint32_t coverage = 0;
     
-    int c;
-    for (c = 0; c < NUMBER_OF_COLOURS; c++) {
+    for (int c = 0; c < NUMBER_OF_COLOURS; c++) {
         coverage = coverage + e->coverage[c];
     }
+    assert(coverage >= 0);
     return coverage;
 }
 
-int element_get_coverage_by_colour(Element * e, short colour)
+uint32_t element_get_coverage_by_colour(Element * e, short colour)
 {
     if ((colour >= 0) && (colour < NUMBER_OF_COLOURS))
         return e->coverage[colour];
@@ -140,7 +140,7 @@ int element_get_coverage_by_colour(Element * e, short colour)
     }
 }
 
-int element_update_coverage(Element * e, short colour, int update)
+uint32_t element_update_coverage(Element * e, short colour, int update)
 {
     if ((colour >= 0) && (colour < NUMBER_OF_COLOURS)) {
         //printf("[element_update_coverage] Update element %x colour %d by %d Total %d\n", e, colour, update, element_get_coverage_all_colours(e));
@@ -209,8 +209,8 @@ Orientation db_node_get_orientation(BinaryKmer * k, dBNode * e, short kmer_size)
     
     printf
     ("programming error - you have called  db_node_get_orientation with a kmer that is neither equal to the kmer in this node, nor its rev comp\n");
-    char tmpseq1[kmer_size];
-    char tmpseq2[kmer_size];
+    char tmpseq1[kmer_size + 1];
+    char tmpseq2[kmer_size + 1];
     printf("Arg 1 Kmer is %s and Arg 2 node kmer is %s\n",
            binary_kmer_to_seq(k, kmer_size, tmpseq1),
            binary_kmer_to_seq(&(e->kmer), kmer_size, tmpseq2));
@@ -953,6 +953,16 @@ void db_node_action_unset_flag_current_path(dBNode * node)
     db_node_action_unset_flag(node, CURRENT_PATH_FORWARD | CURRENT_PATH_REVERSE);
 }
 
+void db_node_action_unset_flag_visited(dBNode * node)
+{
+    db_node_action_unset_flag(node, VISITED);
+}
+
+void db_node_action_unset_flag_visited_forward_reverse(dBNode* node)
+{
+    db_node_action_unset_flag(node, VISITED_FORWARD | VISITED_REVERSE);
+}
+
 void db_node_action_unset_flag(dBNode * node, Flags f)
 {
     //if(DEBUG) printf("UNSET: %x & ~%x = %x\n", node->flags, f, (node->flags & ~f));
@@ -1087,4 +1097,36 @@ boolean element_check_for_flag_ALL_OFF(Element * node)
 boolean element_check_for_flag(Element * node, Flags flag)
 {
     return db_node_check_for_flag((dBNode *) node, flag);
+}
+
+boolean db_node_check_flag_visited_with_orientation(dBNode * node, Orientation orientation)
+{
+    if(orientation == forward)
+    {
+        return db_node_check_for_flag(node, VISITED_FORWARD);
+    }
+    else if(orientation == reverse)
+    {
+        return db_node_check_for_flag(node, VISITED_REVERSE);
+    }
+    else
+    {
+        return false;
+    }
+}
+
+void db_node_action_set_flag_visited_with_orientation(dBNode * node, Orientation orientation)
+{
+    if(orientation == forward)
+    {
+        return db_node_action_set_flag(node, VISITED_FORWARD);
+    }
+    else if(orientation == reverse)
+    {
+        return db_node_action_set_flag(node, VISITED_REVERSE);
+    }
+    else
+    {
+        return;
+    }   
 }

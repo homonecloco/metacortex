@@ -64,7 +64,7 @@
 
 void mark_double_y(dBGraph * db_graph);
 
-void y_walk_print_paths(char *filename, int max_length,int singleton_length, boolean with_coverages, boolean with_viz, dBGraph * db_graph);
+void y_walk_print_paths(char *filename, int max_length,int singleton_length, boolean gfa_fastg_output, boolean with_coverages, boolean with_viz, dBGraph * db_graph);
 
 Path *y_walk_get_path(dBNode * node, Orientation orientation, void (*node_action) (dBNode * node), dBGraph * db_graph, boolean both_directions,Path * path);
 

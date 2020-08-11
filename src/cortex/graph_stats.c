@@ -30,6 +30,7 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <time.h>
+#include <assert.h>
 #include "global.h"
 #include "binary_kmer.h"
 #include "flags.h"
@@ -167,7 +168,6 @@ void clear_list(dBGraph* graph)
  * Params:                                                              *
  * Returns:                                                             *
  *----------------------------------------------------------------------*/
-
 int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue, GraphInfo* nodes_in_graph, float delta)
 {
     Queue* nodes_to_walk;
@@ -222,10 +222,10 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
                 db_graph_get_perfect_path_with_first_edge_all_colours(&first_step, &db_node_action_do_nothing, new_path, graph);
 
                 // check for path coverage here
-                int starting_coverage = element_get_coverage_all_colours(node);
+                uint32_t starting_coverage = element_get_coverage_all_colours(node);
 
                 double path_coverage=0;
-                int min_coverage=0; int max_coverage=0; // required for path_get_statistics()
+                uint32_t min_coverage=0; uint32_t max_coverage=0; // required for path_get_statistics()
                	path_get_statistics(&path_coverage, &min_coverage, &max_coverage, new_path);
 
                 delta_coverage = delta * (float) starting_coverage;
@@ -274,7 +274,7 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
                     // Now go through all nodes, look for best and mark all as visited
                     for (i=0; i<new_path->length; i++) {
                         if (!db_node_check_flag_visited(new_path->nodes[i])) {
-                            int this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
+                            uint32_t this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
                             int this_FOR_edges = db_node_edges_count_all_colours(new_path->nodes[i], forward);
                             int this_REV_edges = db_node_edges_count_all_colours(new_path->nodes[i], reverse);
 
@@ -291,6 +291,7 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
                             }
 
                             db_node_action_set_flag_visited(new_path->nodes[i]);
+                            queue_push(graph_queue, new_path->nodes[i]);
                             nodes_in_graph->total_size++;
                         }
                     } // path->length loop
@@ -308,7 +309,7 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
 
     // Start a queue of nodes to walk
     //log_and_screen_printf("Allocating %d Mb to store queue information (max %d nodes, when full each node could be %d)...\n", ((METACORTEX_QUEUE_SIZE * sizeof(QueueItem*)) / 1024) / 1024, METACORTEX_QUEUE_SIZE, sizeof(QueueItem));
-    nodes_to_walk = queue_new(METACORTEX_QUEUE_SIZE);
+    nodes_to_walk = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!nodes_to_walk) {
         log_and_screen_printf("Couldn't get memory for node queue.\n");
         exit(-1);
@@ -349,7 +350,7 @@ int grow_graph_from_node_stats(dBNode* start_node, dBNode** best_node, dBGraph* 
 // ----------------------------------------------------------------------
 void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                          int min_subgraph_kmers, int min_contig_size, int max_node_edges, float delta_coverage,
-                         int linked_list_max_size, int walk_paths)
+                         int linked_list_max_size, int walk_paths, boolean gfa_fastg_output)
 {
     FILE* fp_analysis;
     FILE* fp_report;
@@ -418,19 +419,29 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
 
 
     /* Open fastg contigs file */
-    sprintf(fastg_filename, "%s.fastg", consensus_contigs_filename);
-    fp_contigs_fastg = fopen(fastg_filename, "w");
-    if (!fp_contigs_fastg) {
-        log_and_screen_printf("ERROR: Can't open contig (fastg) file.\n%s\n", fastg_filename);
-        exit(-1);
-    }
+    if(gfa_fastg_output)
+    {
+        sprintf(fastg_filename, "%s.fastg", consensus_contigs_filename);
+        fp_contigs_fastg = fopen(fastg_filename, "w");
+        if (!fp_contigs_fastg) {
+            log_and_screen_printf("ERROR: Can't open contig (fastg) file.\n%s\n", fastg_filename);
+            exit(-1);
+        }
+        // write the header
+        fprintf(fp_contigs_fastg, "#FASTG:begin;");
+        fprintf(fp_contigs_fastg, "\n#FASTG:version=1.0:assembly_name=\"%s\";", consensus_contigs_filename);
 
-    /* Open gfa contigs file */
-    sprintf(gfa_filename, "%s.gfa", consensus_contigs_filename);
-    fp_contigs_gfa = fopen(gfa_filename, "w");
-    if (!fp_contigs_gfa) {
-        log_and_screen_printf("ERROR: Can't open contig (gfa) file.\n%s\n", gfa_filename);
-        exit(-1);
+        /* Open gfa contigs file */
+        sprintf(gfa_filename, "%s.gfa", consensus_contigs_filename);
+        fp_contigs_gfa = fopen(gfa_filename, "w");
+        if (!fp_contigs_gfa) {
+            log_and_screen_printf("ERROR: Can't open contig (gfa) file.\n%s\n", gfa_filename);
+            exit(-1);
+        }
+        
+        // write the header
+        fprintf(fp_contigs_gfa, "H\n");
+
     }
 
     /* Open the sugraph degree file */
@@ -490,13 +501,19 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
             new_path->length=1;
             * path_length += new_path->length;
             path_destroy(new_path);
+            
+            // is this essentially:
+            //  if (db_node_edge_exist_any_colour(node, n, orientation)) {
+            //      * path_length += 1;
+            //  }
+            // ???
         }
     }
 
     // Hash table iterator to label nodes
     void stats_traversal(dBNode * node) {
         //if (!db_node_check_flag_visited(node)) {
-        int this_coverage = element_get_coverage_all_colours(node) - 1;
+        uint32_t this_coverage = element_get_coverage_all_colours(node) - 1;
         int edges_forward= db_node_edges_count_all_colours(node, forward);
         int edges_reverse = db_node_edges_count_all_colours(node, reverse);
         int all_edges = edges_forward + edges_reverse;
@@ -579,7 +596,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
         }
     } // stats_traversal()
 
-    graph_queue = queue_new(METACORTEX_QUEUE_SIZE);
+    graph_queue = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!graph_queue) {
         log_and_screen_printf("Couldn't get memory for graph queue.\n");
         exit(-1);
@@ -649,6 +666,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
             log_printf("\n");
 
             // now with a subgraph, walk the graph counting degrees by graph
+            // - this sets VISITED flag as true for many of the nodes in the graph.
             grow_graph_from_node_stats(node, &seed_node, graph, graph_queue, nodes_in_graph, delta_coverage);
 
             if (nodes_in_graph->total_size ==1) {
@@ -660,14 +678,18 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
             else if (seed_node == NULL) {
                 printf("ERROR: Seed node is NULL, nodes in graph is %d\n", nodes_in_graph->total_size);
             } else if (nodes_in_graph->total_size) {
+                int kmer_size = graph->kmer_size;
+                char kmer_string[kmer_size + 1];
+                binary_kmer_to_seq(&seed_node->kmer, kmer_size, kmer_string);
+                log_printf("Seed node: %s\n", kmer_string);
                 /* enough nodes to bother with? If so, get consensus contig */
                 if (walk_paths && (nodes_in_graph->total_size >= min_subgraph_kmers)) {
 
                     // should be a perfect path? might be two paths though, if we started in the middle
                     // NOTE: unecessary coverage element but repeating the whole path finding without coverage
                     //  is more work than necessary I think. See what processing time it changes?
-                    coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd);
-                    coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev);
+                    coverage_walk_get_path(seed_node, forward, NULL, graph, path_fwd, true);
+                    coverage_walk_get_path(seed_node, reverse, NULL, graph, path_rev, true);
 
                     path_reverse(path_fwd, simple_path);
                     path_append(simple_path, path_rev);
@@ -679,33 +701,36 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
 
                         // could save the path walking again here if needed, hold these figures in path structure
                         double average_coverage=0;
-                        int min_coverage=0;
-                        int max_coverage=0;
+                        uint32_t min_coverage=0;
+                        uint32_t max_coverage=0;
                         path_get_statistics(&average_coverage, &min_coverage, &max_coverage, simple_path);
                         // NOTE: decision - minimum cov or average cov dictates confidence threshold met?
                         // Output for alternative formats
-                        if(fp_contigs_gfa!=NULL){
-                            fprintf(fp_contigs_gfa, "H %qd", simple_path->id);
-                        }
                         path_to_fasta(simple_path, fp_contigs_fasta);
-                        path_to_fastg_gfa(simple_path, fp_contigs_fastg, fp_contigs_gfa, graph);
+                                               
+                        if(gfa_fastg_output)
+                        {
+                            path_to_gfa2_and_fastg(simple_path,graph,fp_contigs_gfa, fp_contigs_fastg);
+                        }
                         counter++;
                     } else {
                         log_printf("Didn't write path of size %d\n", simple_path->length);
                     }
 
-
+            
                     /*	HERE - INSTEAD OF 'VISITING' AN X-NODE, REMOVE EDGES FROM BEFORE
                      AND AFTER IT ON CURRENT PATH */
+                    
+                    //unset VISITED flags from grow_graph_from_node_stats
                     dBNode* queue_node;
-
                     while (graph_queue->number_of_items > 0) {
                         queue_node = (dBNode*)queue_pop(graph_queue);
                         db_node_action_unset_flag(queue_node, VISITED);
                     }
+                    
+
                     // Now disconnect path from other nodes and mark path as visited, so it's not visited again //
                     for (i=0; i<simple_path->length; i++) {
-
                         if (simple_path->step_flags[i] & X_NODE)
                         {
                             log_printf("[x-NODE IN PATH RETAINED]\n");
@@ -719,6 +744,7 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
                         }
 
                     }
+
 
                     /* Reset paths */
                     path_reset(simple_path);
@@ -768,6 +794,15 @@ void find_subgraph_stats(dBGraph * graph, char* consensus_contigs_filename,
     log_and_screen_printf("Full traversal started...");
     hash_table_traverse(&traversal_for_contigs, graph);
     log_and_screen_printf("DONE\n");
+    
+    // write the fastg footer
+    if(gfa_fastg_output)
+    {
+        fprintf(fp_contigs_fastg, "\n#FASTG:end;");
+        fclose(fp_contigs_fastg);
+        fclose(fp_contigs_gfa);
+    }
+    
     fclose(fp_analysis);
     fclose(fp_degrees);
 
@@ -915,7 +950,7 @@ int explore_subgraphs(dBNode* start_node, dBGraph* graph, GraphInfo* nodes_in_gr
                 db_graph_get_perfect_path_with_first_edge_all_colours(&first_step, &db_node_action_do_nothing, new_path, graph);
 
                 double path_coverage=0;
-                int min_coverage=0; int max_coverage=0; // required for path_get_statistics()
+                uint32_t min_coverage=0; uint32_t max_coverage=0; // required for path_get_statistics()
                 path_get_statistics(&path_coverage, &min_coverage, &max_coverage, new_path);
 
                 if (1)  {
@@ -933,7 +968,7 @@ int explore_subgraphs(dBNode* start_node, dBGraph* graph, GraphInfo* nodes_in_gr
                     // Now go through all nodes, look for best and mark all as visited
                     for (i=0; i<new_path->length; i++) {
                         if (!db_node_check_flag_visited(new_path->nodes[i])) {
-                            int this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
+                            uint32_t this_coverage = element_get_coverage_all_colours(new_path->nodes[i]);
                             int this_FOR_edges = db_node_edges_count_all_colours(new_path->nodes[i], forward);
                             int this_REV_edges = db_node_edges_count_all_colours(new_path->nodes[i], reverse);
 
@@ -1016,7 +1051,7 @@ int explore_subgraphs(dBNode* start_node, dBGraph* graph, GraphInfo* nodes_in_gr
 
     // Start a queue of nodes to walk
     //log_and_screen_printf("Allocating %d Mb to store queue information (max %d nodes, when full each node could be %d)...\n", ((METACORTEX_QUEUE_SIZE * sizeof(QueueItem*)) / 1024) / 1024, METACORTEX_QUEUE_SIZE, sizeof(QueueItem));
-    nodes_to_walk = queue_new(METACORTEX_QUEUE_SIZE);
+    nodes_to_walk = node_queue_new(METACORTEX_QUEUE_SIZE);
     if (!nodes_to_walk) {
         log_and_screen_printf("Couldn't get memory for node queue.\n");
         exit(-1);

@@ -70,6 +70,7 @@
 #include <perfect_path.h>
 #include <logger.h>
 #include <y_walk.h>
+#include <metacortex.h>
 
 static pathStep *get_next_step(pathStep * current_step, pathStep * next_step,
                                pathStep * reverse_step, dBGraph * db_graph)
@@ -369,100 +370,137 @@ Path *y_walk_get_path(dBNode * node, Orientation orientation,
     return path;	
 }
 
-void y_walk_print_paths(char *filename, int max_length, int singleton_length, 
+void y_walk_print_paths(char *filename, int max_length, int singleton_length, boolean gfa_fastg_output,
                         boolean with_coverages, boolean with_viz, dBGraph * db_graph)
 {
     
-	Path *path = path_get_buffer_path();	//We will try to use only this buffer path.
+    Path *path = path_get_buffer_path();	//We will try to use only this buffer path.
+    path_reset(path);
+
+    WalkingFunctions wf;
+
+    FILE *fout;
+    FILE *fout_cov;
+    FILE *fout_viz;
+    FILE* fp_contigs_fastg;
+    FILE* fp_contigs_gfa;
+
+    char gfa_filename[256];
+    char fastg_filename[256];
+
+    fout = fopen(filename, "w");
+
+    remove_file_extension(filename);
+    /* Open fastg contigs file */
+    if(gfa_fastg_output)
+    {
+        sprintf(fastg_filename, "%s.fastg", filename);
+        fp_contigs_fastg = fopen(fastg_filename, "w");
+        if (!fp_contigs_fastg) {
+            log_and_screen_printf("ERROR: Can't open contig (fastg) file.\n%s\n", fastg_filename);
+            exit(-1);
+        }
+        // write the header
+        fprintf(fp_contigs_fastg, "#FASTG:begin;");
+        fprintf(fp_contigs_fastg, "\n#FASTG:version=1.0:assembly_name=\"%s\";", filename);
+
+        /* Open gfa contigs file */
+        sprintf(gfa_filename, "%s.gfa", filename);
+        fp_contigs_gfa = fopen(gfa_filename, "w");
+        if (!fp_contigs_gfa) {
+            log_and_screen_printf("ERROR: Can't open contig (gfa) file.\n%s\n", gfa_filename);
+            exit(-1);
+        }
+    }
+
+    if (with_coverages) {
+            char filename_cov[strlen(filename) + 10];
+            sprintf(filename_cov, "%s_cov", filename);
+            fout_cov = fopen(filename_cov, "w");
+    }
+
+    if (with_viz) {
+            char filename_cov[strlen(filename) + 10];
+            sprintf(filename_cov, "%s.viz", filename);
+            fout_viz = fopen(filename_cov, "w");
+            path_graphviz_open_header(fout_viz);
+    }
+
+    int count_nodes = 0;
     
-	path_reset(path);
-    
-	WalkingFunctions wf;
-    
-	FILE *fout;
-	FILE *fout_cov;
-	FILE *fout_viz;
-	
-	fout = fopen(filename, "w");
-    
-	if (with_coverages) {
-		char filename_cov[strlen(filename) + 10];
-		sprintf(filename_cov, "%s_cov", filename);
-		fout_cov = fopen(filename_cov, "w");
-	}
-	
-	if (with_viz) {
-		char filename_cov[strlen(filename) + 10];
-		sprintf(filename_cov, "%s.viz", filename);
-		fout_viz = fopen(filename_cov, "w");
-		path_graphviz_open_header(fout_viz);
-	}
-	
-	int count_nodes = 0;
-    
-	//path->id=-1;
-	long long count_kmers = 0;
-	long long count_sing = 0;
+    //path->id=-1;
+    long long count_kmers = 0;
+    long long count_sing = 0;
     long long count_rep = 0;
     double graph_cov = db_graph_get_average_coverage(db_graph);
-	PathCounts counts;
+    PathCounts counts;
     path_counts_reset(&counts); 
     
-	mark_double_y(db_graph);
-	path_reset(path);
-    
-	perfect_path_get_functions(&wf);
-	wf.continue_traversing = &continue_traversing;
+    mark_double_y(db_graph);
+    path_reset(path);
+
+    perfect_path_get_functions(&wf);
+    wf.continue_traversing = &continue_traversing;
     //TODO: write a function that actually looks for where to start... 
-	wf.get_starting_step = &get_first_step_identity;
-    
-	void print_supernode(dBNode * node) {
+    wf.get_starting_step = &get_first_step_identity;
+
+    void print_supernode(dBNode * node) {
         
-		count_kmers++;
-		if (db_node_check_flag_visited(node) == false && db_node_check_flag_not_pruned(node)) {
-            
-			y_walk_get_path(node, undefined,
-                            &db_node_action_set_flag_visited,
-                            db_graph, true,path);
-            
-			if (path_is_singleton(singleton_length, path)) {
+        count_kmers++;
+        if (db_node_check_flag_visited(node) == false && db_node_check_flag_not_pruned(node)) {
+            y_walk_get_path(node, undefined,
+            &db_node_action_set_flag_visited,
+            db_graph, true,path);
+
+            if (path_is_singleton(singleton_length, path)) {
                 count_sing++;
             }else if(path_is_repetitive(graph_cov, path)){
                 count_rep++;
             }else {
-				if (with_coverages) {
-					path_to_coverage(path, fout_cov);
-				}
-				if(with_viz){
-					path_graphviz_line(fout_viz, path);
-				}
-				path_to_fasta(path, fout);
-				if (path->length == max_length) {
-					log_and_screen_printf("contig length equals max length [%i] for node_%i\n", max_length, count_nodes);
-				}
-				path_counts_add(path, &counts);
-				count_nodes++;
-				path_increase_id(path);
-			}
-		}
-	}
-    
-	hash_table_traverse(&print_supernode, db_graph);
-	log_and_screen_printf("%'d nodes visited [%'qd singletons, %'qd repetitive]\n", count_nodes, count_sing);
-	path_counts_print_and_log(&counts);
-	
-	fclose(fout);
-	if (with_coverages) {
-		fclose(fout_cov);
-	}
-	if (with_viz) {
-		path_graphviz_close_header(fout_viz);
-		fclose(fout_viz);
-	}
-    
+                if (with_coverages) {
+                    path_to_coverage(path, fout_cov);
+                }
+                if(with_viz){
+                    path_graphviz_line(fout_viz, path);
+                }
+                path_to_fasta(path, fout);
+                if(gfa_fastg_output)
+                {
+                    path_to_gfa2_and_fastg(path, db_graph, fp_contigs_gfa, fp_contigs_fastg);
+                }
+                if (path->length == max_length) {
+                    log_and_screen_printf("contig length equals max length [%i] for node_%i\n", max_length, count_nodes);
+                }
+                path_counts_add(path, &counts);
+                count_nodes++;
+                path_increase_id(path);
+            }
+        }
+    }
+
+    hash_table_traverse(&print_supernode, db_graph);
+    log_and_screen_printf("%'d nodes visited [%'qd singletons, %'qd repetitive]\n", count_nodes, count_sing);
+    path_counts_print_and_log(&counts);
+
+    fclose(fout);
+    if (with_coverages) {
+            fclose(fout_cov);
+    }
+    if (with_viz) {
+            path_graphviz_close_header(fout_viz);
+            fclose(fout_viz);
+    }
+
+    // write the fastg footer
+    if(gfa_fastg_output)
+    {
+        fprintf(fp_contigs_fastg, "\n#FASTG:end;");
+        fclose(fp_contigs_fastg);
+        fclose(fp_contigs_gfa);
+    }
+        
     path_free_buffer_path(path);
-    
-	return;
+    return;
 }
 
 

@@ -58,6 +58,8 @@
 /************************************************************************
  * branches.h
  ************************************************************************/
+#ifndef BRACHES_H
+#define BRANCHES_H
 
 void branches_get_path(char * filename, int max_length, boolean with_coverages, dBGraph * db_graph) ;
 
@@ -69,4 +71,4 @@ Path * branches_get_path_between(pathStep * first, pathStep * last, int max_leng
 
 Path * branches_get_path_between_paths(Path * first_path, Path * last_path, int max_length, int max_depth, Path * path,  dBGraph * db_graph);
 
-
+#endif // BRANCHES_H

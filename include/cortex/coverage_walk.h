@@ -26,5 +26,11 @@
  *
  * Highest coverage walk used by MetaCortex.
  ************************************************************************/
+#ifndef COVERAGE_WALK_H
+#define COVERAGE_WALK_H
 
-int coverage_walk_get_path(dBNode * node, Orientation orientation, void (*node_action) (dBNode * node), dBGraph * db_graph, Path * path);
+int coverage_walk_get_path(dBNode * node, Orientation orientation, void (*node_action) (dBNode * node), dBGraph * db_graph, Path * path, boolean check_bubbles);
+
+void coverage_walk_get_path_forwards_and_backwards(dBNode * node, void (*node_action) (dBNode * node), dBGraph * db_graph, Path * path, boolean check_bubbles, int explore_length);
+
+#endif //COVERAGE_WALK_H

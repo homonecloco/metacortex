@@ -58,7 +58,8 @@
 /************************************************************************
  * graph_tools.h
  ************************************************************************/
-
+#ifndef GRAPH_TOOLS_H
+#define GRAPH_TOOLS_H
 typedef struct {
     int kmer_size;
     boolean only_major_nodes;
@@ -91,3 +92,5 @@ int graph_tools_walk_around(GraphToolsOptions* options, GraphToolsState* state, 
 int graph_tools_walk_subgraph_for_kmer(BinaryKmer* start_kmer, GraphToolsOptions* options, GraphToolsState* state, dBGraph* db_graph);
 
 void graph_tools_output_subgraph_for_kmer(char* filename, int graph_format, GraphToolsOptions* options, GraphToolsState* state, dBGraph* db_graph);
+
+#endif //GRAPH_TOOLS_H

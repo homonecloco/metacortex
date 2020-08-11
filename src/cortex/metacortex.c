@@ -80,6 +80,7 @@
 #include "metagraphs.h"
 #include "graph_stats.h"
 #include "bubble_find.h"
+#include "subtractive_walk.h"
 
 typedef struct {
     char* filename;
@@ -447,6 +448,7 @@ int main(int argc, char **argv)
     }
 
     if (cmd_line.output_fasta) {
+        db_graph->path_coverage_minimum = cmd_line.path_coverage_minimum;
         switch (cmd_line.algorithm) {
             case PERFECT_PATH:
                 log_and_screen_printf("\nDumping supernodes: %s\n", cmd_line.output_fasta_filename);
@@ -462,7 +464,7 @@ int main(int argc, char **argv)
                 log_and_screen_printf("\nDumping supernodes (Y_WALK): %s\n", cmd_line.output_fasta_filename);
                 fflush(stdout);
                 y_walk_print_paths(cmd_line.output_fasta_filename,
-                                   cmd_line.max_length,cmd_line.singleton_length,
+                                   cmd_line.max_length, cmd_line.singleton_length, cmd_line.gfa_and_fastg,
                                    cmd_line.output_coverages, cmd_line.graphviz, db_graph);
                 log_and_screen_printf("Dump complete\n");
                 break;
@@ -473,7 +475,8 @@ int main(int argc, char **argv)
                 break;
             case METACORTEX_CONSENSUS:
                 log_and_screen_printf("\nDumping subgraph consensus contigs: %s\n", cmd_line.output_fasta_filename);
-                metacortex_find_subgraphs(db_graph, cmd_line.output_fasta_filename, cmd_line.min_subgraph_size, cmd_line.min_contig_length, cmd_line.multiple_subgraph_contigs);
+                metacortex_find_subgraphs(db_graph, cmd_line.output_fasta_filename, cmd_line.min_subgraph_size, cmd_line.min_contig_length, 
+                                                    cmd_line.multiple_subgraph_contigs, cmd_line.gfa_and_fastg);
                 break;
             case GRAPH_STATS:
                 // if --high_confidence option set by user, alter output name accordingly
@@ -483,18 +486,16 @@ int main(int argc, char **argv)
                     sprintf(cmd_line.output_fasta_filename, "%s.high_conf", temp);
                 }
 
-                // pass path_coverage_minimum value to dBgraph for use later
-                db_graph->path_coverage_minimum = cmd_line.path_coverage_minimum;
-
                 log_and_screen_printf("\nSearching graph for stats...\n");
                 find_subgraph_stats(db_graph, cmd_line.output_fasta_filename,
                   cmd_line.min_subgraph_size, cmd_line.min_contig_length,
                   cmd_line.max_node_edges, cmd_line.delta_coverage,
                   cmd_line.linked_list_max_size,
-                  cmd_line.multiple_subgraph_contigs);
+                  cmd_line.multiple_subgraph_contigs,
+                  cmd_line.gfa_and_fastg);
 
 
-                /* Put all of this into a seperate command line call (BUBBLEFIND)*/
+                /* Put all of this into a separate command line call (BUBBLEFIND)*/
                 //db_graph_identify_branches(1000, db_graph);
                 //log_and_screen_printf("\nSearching graph for branches and bubbles...\n");
                 //db_graph_walk_branches(cmd_line.output_fasta_filename, total_max_length, db_graph->kmer_size * 10 + 1, bubble_max_depth, db_graph);
@@ -502,6 +503,12 @@ int main(int argc, char **argv)
                 //db_graph_walk_branches(char *filename, int total_max_length, int bubble_max_length, int bubble_max_depth, dBGraph * db_graph)
                 //metacortex_find_subgraphs(db_graph, cmd_line.output_fasta_filename, cmd_line.min_subgraph_size, cmd_line.min_contig_length, cmd_line.multiple_subgraph_contigs);
                 break;
+            case SUBTRACTIVE_WALK:
+
+                log_and_screen_printf("\nPerforming iterative subtractive walk..\n");       
+                subtractive_walk(db_graph, cmd_line.output_fasta_filename, cmd_line.min_contig_length, cmd_line.delta_coverage);
+                break;
+                
             default:
                 log_and_screen_printf("Algorithm not implemented \n");
                 break;
@@ -522,14 +529,14 @@ int main(int argc, char **argv)
 void print_graph(dBGraph * db_graph)
 {
 	void print_graphviz(dBNode * node) {
-		if (node != NULL) {
+		if (node != NULL && element_get_coverage_all_colours(node) > 0) {
 			BinaryKmer tmp, co;
 
 			short kmer_size = db_graph->kmer_size;
 			binary_kmer_assignment_operator(tmp, node->kmer);
 			binary_kmer_reverse_complement(&tmp, kmer_size, &co);
-			char seq[kmer_size], seqNext[kmer_size],
-			    seq1[kmer_size];
+			char seq[kmer_size + 1], seqNext[kmer_size + 1],
+			    seq1[kmer_size + 1];
 			binary_kmer_to_seq(&tmp, kmer_size, seq1);
 			char *print = db_node_check_for_any_flag(node,
 								 STARTING_FORWARD

@@ -24,5 +24,7 @@
 /************************************************************************
  * metacortex.h
  ************************************************************************/
-
+#ifndef METACORTEX_H
+#define METACORTEX_H
 char * remove_file_extension(char * filename);
+#endif // METACORTEX_H

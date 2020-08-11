@@ -24,11 +24,16 @@
 /************************************************************************
  * metagraphs.h
  ************************************************************************/
+#ifndef METAGRAPHS_H
+#define METAGRAPHS_H
 
 #define MAX_SEEDS 200000000
 #define METACORTEX_QUEUE_SIZE 20000000 // 10000000
 #define MAX_EXPLORE_PATH_LENGTH 2000000
 #define MAX_EXPLORE_NODES 200
+#define MAX_EXPLORE_BRANCHES 200
+
+#include "node_queue.h"
 
 typedef struct {
     dBNode* seed_node;
@@ -46,4 +51,9 @@ typedef struct {
 
 //int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue);
 
-void metacortex_find_subgraphs(dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, boolean multiple_subgraph_contigs);
+void metacortex_find_subgraphs( dBGraph* graph, char* consensus_contigs_filename, int min_subgraph_kmers, int min_contig_length, 
+                                boolean multiple_subgraph_contigs, boolean gfa_fastg_output);
+
+int grow_graph_from_node(dBNode* start_node, dBNode** best_node, dBGraph* graph, Queue* graph_queue, int max_search_size);
+
+#endif // METAGRAPHS_H

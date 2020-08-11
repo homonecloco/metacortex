@@ -378,7 +378,7 @@ static void check_tip(Path * p){
         }
     }else{
         double avg;
-        int min, max;
+        uint32_t min, max;
         path_get_statistics(&avg, &min, &max, p);
        /* if(avg > 1 && path_get_length(p) < tip_clip_length){
             path_to_fasta(p, stdout);
